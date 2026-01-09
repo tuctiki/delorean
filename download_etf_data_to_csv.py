@@ -3,19 +3,8 @@ import pandas as pd
 import os
 import re
 
-# From data_acquisition.py, copied here to avoid circular dependency
-ETF_LIST = [
-    "510300.SH",   # 沪深300ETF（主流宽基）
-    "159339.SH",   # 中证A500ETF（您指定；若无数据, 可替换为"512050.SH"或"159360.SZ"等主流A500ETF）
-    "512480.SH",   # 半导体ETF
-    "516160.SH",   # 新能源车ETF
-    "512690.SH",   # 白酒ETF
-    "512800.SH",   # 银行ETF
-    "512010.SH",   # 医药ETF
-    "510630.SH",   # 消费ETF
-    "515790.SH",   # 光伏ETF
-    "512880.SH",   # 证券ETF（补充一个金融子行业）
-]
+from constants import ETF_LIST
+
 
 def get_etf_hist_data(symbol: str, start_date: str, end_date: str) -> pd.DataFrame:
     """

@@ -16,10 +16,10 @@ The workflow involves three main stages to prepare ETF data for Qlib application
 
 ### 1. Download ETF Historical Data from AkShare
 
-This step fetches daily historical data for a predefined list of Chinese ETFs using the AkShare library. The data is saved as CSV files.
+This step fetches daily historical data for a predefined list of Chinese ETFs using the AkShare library. The `ETF_LIST` is defined in `constants.py`.
 
 -   **Script**: `download_etf_data_to_csv.py`
--   **Purpose**: Fetches data for ETFs listed in `ETF_LIST` (defined within the script).
+-   **Purpose**: Fetches data for ETFs listed in `constants.py`.
 -   **Output**: CSV files for each ETF, stored in `~/.qlib/csv_data/akshare_etf_data/`.
 
 **To run this step:**
@@ -47,23 +47,19 @@ python vendors/qlib/scripts/dump_bin.py dump_all \
 --exclude_fields symbol
 ```
 
-### 3. Preprocess ETF Data for Qlib Applications
+### 3. Analyze and Preprocess ETF Data
 
-This script loads the Qlib binary data, performs feature engineering, and preprocesses the data into Qlib's `DatasetH` object, ready for model training or backtesting.
+This script serves as the main entry point for data analysis and preprocessing. It loads the Qlib binary data, performs feature engineering, and preprocesses the data into a `DatasetH` object, which is ready for model training or backtesting. It also demonstrates how to access both raw and preprocessed data.
 
--   **Script**: `qlib_etf_preprocessing.py`
+-   **Script**: `etf_analyzer.py`
 -   **Purpose**:
     *   Initializes Qlib to point to the `cn_etf_data` directory.
-    *   Defines a custom `ETFDataHandler` to load raw data, calculate derived features (e.g., lagged prices, volume means, volatility) and a next-day return label.
-    *   Applies preprocessing steps: dropping missing features, dropping rows with missing labels, and cross-sectional Z-score normalization.
+    *   Demonstrates how to fetch raw ETF data using `qlib.data.D.features()`.
+    *   Defines a custom `ETFDataHandler` to load and preprocess data, including feature engineering and normalization.
     *   Splits the data into training, validation, and testing segments (`DatasetH`).
-    *   Demonstrates how to access prepared features and labels from the `DatasetH`.
+    *   Shows how to access the final, preprocessed features and labels from the `DatasetH` object.
 
 **To run this step:**
 ```bash
-python qlib_etf_preprocessing.py
+python etf_analyzer.py
 ```
-
-## Accessing Prepared Data
-
-Once the data is preprocessed, it can be accessed in other Qlib-based applications. The `qlib.init` call in `qlib_etf_preprocessing.py` (and potentially `access_qlib_etf_data.py` if used for generic access) ensures that Qlib points to the correct ETF data directory (`~/.qlib/qlib_data/cn_etf_data`). You can then use `qlib.data.D.features()` or the `DatasetH` object directly to retrieve historical data for the specified ETFs.
