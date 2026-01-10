@@ -133,3 +133,5 @@ mlruns/
 Users/
 .DS_Store
 *.csv
+*.pkl
+*.png

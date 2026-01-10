@@ -1,11 +1,7 @@
 from qlib.data.dataset import DatasetH
 from qlib.data.dataset.handler import DataHandlerLP
 from qlib.data.dataset.processor import CSZScoreNorm, DropnaLabel
-from qlib.contrib.model.gbdt import LGBModel
-from qlib.workflow import R
-import pandas as pd
-import matplotlib.pyplot as plt
-from constants import START_TIME, END_TIME, TRAIN_END_TIME, TEST_START_TIME, ETF_LIST
+from constants import ETF_LIST, START_TIME, END_TIME, TRAIN_END_TIME, TEST_START_TIME
 
 class ETFDataHandler(DataHandlerLP):
     def __init__(self, instruments, start_time, end_time, **kwargs):
@@ -21,6 +17,10 @@ class ETFDataHandler(DataHandlerLP):
                 "$volume / Mean($volume, 20)",                       # Short-term Volume Ratio
                 "$volume / Mean($volume, 60)",                       # Medium-term Volume Ratio
                 "Skew($close / Ref($close, 1) - 1, 20)",       # 20-day Skewness
+                # New Optimized Features
+                "(EMA($close, 12) - EMA($close, 26)) / $close",      # MACD Trend (Normalized)
+                "100 * EMA(($close > Ref($close, 1)) * ($close - Ref($close, 1)), 14) / EMA(Abs($close - Ref($close, 1)), 14)", # RSI 14 (Approx)
+                "($close / Ref($close, 20) - 1) / Std($close / Ref($close, 1) - 1, 20)", # Vol-Adjusted Momentum
             ],
             "label": [
                 "Ref($close, -1) / $close - 1"  # Next Day Return
@@ -43,11 +43,10 @@ class ETFDataHandler(DataHandlerLP):
             **kwargs
         )
 
-class ETFStrategy:
+class ETFDataLoader:
     def __init__(self):
         self.handler = None
         self.dataset = None
-        self.model = None
 
     def load_data(self):
         print("Initializing ETF DataHandler...")
@@ -68,58 +67,10 @@ class ETFStrategy:
             segments=segments,
         )
         self._print_data_stats()
+        return self.dataset
 
     def _print_data_stats(self):
         train_features = self.dataset.prepare("train", col_set="feature")
         print(f"Training set shape: {train_features.shape}")
         print(f"Features: {list(train_features.columns)}")
         print("\nTraining set correlation:\n", train_features.corr().round(2))
-
-    def train_model(self):
-        print("\nUsing LightGBM Model...")
-        self.model = LGBModel(
-            loss="mse",
-            colsample_bytree=0.887,
-            learning_rate=0.05,
-            subsample=0.7,
-            lambda_l1=1,
-            lambda_l2=1,
-            max_depth=-1,
-            num_leaves=31,
-            min_data_in_leaf=20,
-            early_stopping_rounds=50,
-        )
-        
-        print("Starts training...")
-        with R.start(experiment_name="ETF_Strategy") as recorder:
-            self.model.fit(self.dataset)
-            self.predict(recorder)
-            self.analyze_feature_importance()
-
-    def predict(self, recorder):
-        print("Generating test set predictions...")
-        pred = self.model.predict(self.dataset)
-        R.save_objects(pred=pred)
-        print("\nTest prediction sample (head 20):\n", pred.head(20))
-
-    def analyze_feature_importance(self):
-        feature_importance = pd.DataFrame({
-            'feature': self.dataset.prepare("train", col_set="feature").columns,
-            'importance': self.model.get_feature_importance()
-        }).sort_values('importance', ascending=False)
-
-        print("\nTop 10 Feature Importance:\n", feature_importance.head(10))
-        
-        try:
-            plt.figure(figsize=(10, 6))
-            plt.bar(feature_importance['feature'][:10], feature_importance['importance'][:10])
-            plt.xticks(rotation=45, ha='right')
-            plt.title("LightGBM Factor Importance Top 10")
-            plt.tight_layout()
-            print("Feature importance plot generated (display skipped).")
-        except Exception as e:
-            print(f"Plotting failed: {e}")
-
-    def run(self):
-        self.load_data()
-        self.train_model()

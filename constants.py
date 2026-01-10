@@ -14,6 +14,9 @@ ETF_LIST = [
     "512880.SH",    # 证券
 ]
 
+# Benchmark
+BENCHMARK = "510300.SH"
+
 # Time Range
 START_TIME = "2018-01-01"
 END_TIME = "2022-12-31"

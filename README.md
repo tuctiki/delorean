@@ -47,35 +47,36 @@ python vendors/qlib/scripts/dump_bin.py dump_all \
 --exclude_fields symbol
 ```
 
-### 3. Analyze and Preprocess ETF Data
+### 3. Run Strategy Analysis (End-to-End)
 
-The `etf_analyzer.py` script serves as the core analysis module. It loads the Qlib binary data, performs feature engineering (calculating factors like momentum, volatility, etc.), and preprocesses the data into a `DatasetH` object.
+The project has been refactored into a modular architecture for better maintainability and scalability. The main entry point `run_etf_analysis.py` orchestrates the entire pipeline:
 
--   **Script**: `etf_analyzer.py` (executed via `run_etf_analysis.py`)
--   **Purpose**:
-    *   Initializes Qlib environment.
-    *   Defines `ETFDataHandler` for factor calculation and labeling.
-    *   Splits data into training (2018-2020) and testing (2021-2022) sets.
-    *   Calculates 10 alpha factors (e.g., Mom20, Vol20, Reversal).
+-   **`data.py`**: Handles data loading and feature engineering (calculating factors like Momentum, Volatility, RSI, MACD).
+-   **`model.py`**: Manages LightGBM model training and prediction.
+-   **`backtest.py`**: Executes the `TopkDropoutStrategy` backtest using Qlib's engine.
+-   **`analysis.py`**: Calculates metrics (Alpha, Sharpe, Drawdown) and generates visualization plots.
 
-**To run this step:**
+**To run the complete analysis:**
 ```bash
 python run_etf_analysis.py
 ```
-*Note: We use `run_etf_analysis.py` as the entry point to ensure safe multiprocessing on macOS.*
 
-### 4. Build Alpha Model (LightGBM)
+**What happens when you run this:**
+1.  **Initialization**: Qlib is initialized with local provider settings.
+2.  **Data Loading**: Historical ETF data is loaded, and 13 technical factors (including RSI, MACD, Volatility) are computed.
+3.  **Model Training**: A LightGBM model trains on data from 2018-2020 to predict future returns.
+4.  **Backtest**: The `TopkDropoutStrategy` (Top 3, Drop 1) is simulated on the test period (2021-2022).
+5.  **Analysis**:
+    -   Metrics are printed to the console (Annualized Return, Max Drawdown, Turnover).
+    -   **Plots Generated**: `cumulative_return.png` and `excess_return.png`.
+    -   **Reports Saved**: `backtest_report.pkl`, `backtest_positions.pkl`, `backtest_analysis.pkl`.
 
-The project includes an Alpha model construction step integrated into `etf_analyzer.py`. It uses LightGBM to predict future ETF returns based on the calculated factors.
+### 4. Strategy Details
 
--   **Model**: LightGBM (Gradient Boosting Decision Tree)
+-   **Model**: LightGBM (Gradient Boosting)
 -   **Target**: Next day return (`Ref($close, -1) / $close - 1`)
--   **Features**: 10 factors including Volume-Price trends, Momentum, Volatility, and Reversal.
--   **Workflow**:
-    1.  Trains the model on the training set.
-    2.  Generates prediction scores (ranking scores) for the test set.
-    3.  Outputs feature importance to identify the most predictive factors.
-
-**Output Example:**
--   **Feature Importance**: ranks factors like `Log(Mean($volume * $close, 20))` (Liquidity) and `$close / Ref($close, 20) - 1` (Momentum).
--   **Prediction Scores**: Daily scores for each ETF, indicating relative expected performance.
+-   **Features**: Market Cap, Momentum (20/60/120 days), Volatility, RSI, MACD, Volume Ratios.
+-   **Strategy**: `TopkDropoutStrategy`
+    -   **Top K**: Holds the top 3 ETFs with highest predicted scores.
+    -   **N Drop**: Replaces 1 ETF per rebalancing period to ensure portfolio freshness.
+    -   **Rebalancing**: Daily.
