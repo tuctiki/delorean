@@ -26,3 +26,9 @@ TEST_START_TIME = "2021-01-01"
 # Qlib Config
 QLIB_PROVIDER_URI = '~/.qlib/qlib_data/cn_etf_data'
 QLIB_REGION = REG_CN
+
+# Output Config
+import os
+OUTPUT_DIR = "artifacts"
+if not os.path.exists(OUTPUT_DIR):
+    os.makedirs(OUTPUT_DIR)

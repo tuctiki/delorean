@@ -135,3 +135,6 @@ Users/
 *.csv
 *.pkl
 *.png
+
+# Output artifacts
+artifacts/

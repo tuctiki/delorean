@@ -2,6 +2,9 @@ from qlib.contrib.evaluate import risk_analysis
 import pandas as pd
 import matplotlib.pyplot as plt
 
+from constants import OUTPUT_DIR
+import os
+
 class ResultAnalyzer:
     def process(self, report, positions):
         # Calculate risk analysis
@@ -11,10 +14,10 @@ class ResultAnalyzer:
         print(report.head())
 
         # Save results
-        report.to_pickle("backtest_report.pkl")
-        pd.to_pickle(positions, "backtest_positions.pkl")
-        pd.to_pickle(analysis, "backtest_analysis.pkl")
-        print("\nBacktest results saved to pkl files.")
+        report.to_pickle(os.path.join(OUTPUT_DIR, "backtest_report.pkl"))
+        pd.to_pickle(positions, os.path.join(OUTPUT_DIR, "backtest_positions.pkl"))
+        pd.to_pickle(analysis, os.path.join(OUTPUT_DIR, "backtest_analysis.pkl"))
+        print(f"\nBacktest results saved to pkl files in {OUTPUT_DIR}.")
 
         # Turnover
         # Calculate turnover rate: total_turnover / value
@@ -56,8 +59,8 @@ class ResultAnalyzer:
             plt.legend()
             plt.grid(True, alpha=0.3)
             plt.tight_layout()
-            plt.savefig("cumulative_return.png")
-            print("Saved plot: cumulative_return.png")
+            plt.savefig(os.path.join(OUTPUT_DIR, "cumulative_return.png"))
+            print(f"Saved plot: {os.path.join(OUTPUT_DIR, 'cumulative_return.png')}")
             
             # Excess Return
             excess_ret = (1 + report["return"]).cumprod() - (1 + report["bench"]).cumprod()
@@ -66,8 +69,8 @@ class ResultAnalyzer:
             plt.title("Cumulative Excess Return")
             plt.grid(True, alpha=0.3)
             plt.tight_layout()
-            plt.savefig("excess_return.png")
-            print("Saved plot: excess_return.png")
+            plt.savefig(os.path.join(OUTPUT_DIR, "excess_return.png"))
+            print(f"Saved plot: {os.path.join(OUTPUT_DIR, 'excess_return.png')}")
 
 
         except Exception as e:
@@ -163,8 +166,8 @@ class FactorAnalyzer:
             plt.title("Information Coefficient (IC) by Factor")
             plt.xlabel("IC Value")
             plt.tight_layout()
-            plt.savefig("factor_ic.png")
-            print("Saved plot: factor_ic.png")
+            plt.savefig(os.path.join(OUTPUT_DIR, "factor_ic.png"))
+            print(f"Saved plot: {os.path.join(OUTPUT_DIR, 'factor_ic.png')}")
             
             # 2. Correlation Matrix
             plt.figure(figsize=(10, 10))
@@ -175,8 +178,8 @@ class FactorAnalyzer:
             plt.yticks(range(len(corr)), corr.columns)
             plt.title("Feature Correlation Matrix")
             plt.tight_layout()
-            plt.savefig("feature_correlation.png")
-            print("Saved plot: feature_correlation.png")
+            plt.savefig(os.path.join(OUTPUT_DIR, "feature_correlation.png"))
+            print(f"Saved plot: {os.path.join(OUTPUT_DIR, 'feature_correlation.png')}")
             
         except Exception as e:
             print(f"Factor plotting failed: {e}")
