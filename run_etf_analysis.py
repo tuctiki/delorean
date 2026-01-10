@@ -3,7 +3,7 @@ from constants import QLIB_PROVIDER_URI, QLIB_REGION
 from data import ETFDataLoader
 from model import ModelTrainer
 from backtest import BacktestEngine
-from analysis import ResultAnalyzer
+from analysis import ResultAnalyzer, FactorAnalyzer
 from qlib.workflow import R
 
 if __name__ == "__main__":
@@ -14,7 +14,11 @@ if __name__ == "__main__":
     data_loader = ETFDataLoader()
     dataset = data_loader.load_data()
 
-    # 3. Model Training
+    # 3. Factor Analysis
+    factor_analyzer = FactorAnalyzer()
+    factor_analyzer.analyze(dataset)
+
+    # 4. Model Training
     model_trainer = ModelTrainer()
     
     # Using Recorder for experiment tracking

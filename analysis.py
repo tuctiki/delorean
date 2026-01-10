@@ -69,5 +69,114 @@ class ResultAnalyzer:
             plt.savefig("excess_return.png")
             print("Saved plot: excess_return.png")
 
+
         except Exception as e:
             print(f"Plotting failed: {e}")
+
+class FactorAnalyzer:
+    def analyze(self, dataset):
+        print("\n=== Factor Impact Analysis ===")
+        
+        # 1. Prepare Data
+        # We need the dataframe with features and label
+        # segments["train"] is typically used for analysis
+        df = dataset.prepare("train")
+        
+        # Separate features and label
+        label_col = "Ref($close, -1) / $close - 1"
+        if label_col not in df.columns:
+            # Try to find the label column (it might be named differently or is the last column)
+            # In Qlib, labels are often handled separately or named 'label' in some contexts,
+            # but here we defined it explicitly. Let's check columns.
+            # Usually dataset.prepare returns features. The label might be in a separate handler?
+            # Actually, DataHandlerLP prepares both.
+            # Let's inspect columns effectively.
+            # "feature" columns are under 'feature' multiindex level if applicable, or flat.
+            pass
+
+
+
+        # Calculate IC and RankIC
+        ic_data = []
+        
+        # If MultiIndex columns (feature, label)
+        if isinstance(df.columns, pd.MultiIndex):
+            feature_df = df["feature"]
+            label_df = df["label"]
+            # Assuming single label
+            label = label_df.iloc[:, 0]
+        else:
+            # Handle flat columns
+            if label_col in df.columns:
+                label = df[label_col]
+                # Filter out label to get features
+                feature_df = df.drop(columns=[label_col])
+            else:
+                print(f"Warning: Label column '{label_col}' not found in dataframe.")
+                return
+
+        results = []
+        
+        print(f"Analyzing {len(feature_df.columns)} features...")
+        
+        for feature_name in feature_df.columns:
+            feature_val = feature_df[feature_name]
+            
+            # Algin indices
+            msg_df = pd.DataFrame({"feature": feature_val, "label": label}).dropna()
+            
+            if len(msg_df) < 10:
+                continue
+
+            # IC: Correlation
+            ic = msg_df["feature"].corr(msg_df["label"])
+            
+            # RankIC: Spearman Correlation
+            rank_ic = msg_df["feature"].corr(msg_df["label"], method="spearman")
+            
+            results.append({
+                "Feature": feature_name,
+                "IC": ic,
+                "RankIC": rank_ic,
+                "Direction": "Positive" if ic > 0 else "Negative"
+            })
+            
+        results_df = pd.DataFrame(results).sort_values("IC", ascending=False)
+        
+        # Sort by Abs(IC) for impact
+        results_df["Abs_IC"] = results_df["IC"].abs()
+        results_df = results_df.sort_values("Abs_IC", ascending=False)
+        
+        print("\nFactor Analysis Results (Sorted by Impact):")
+        print(results_df[["Feature", "IC", "RankIC", "Direction"]].to_string(index=False))
+        
+        self.plot_analysis(results_df, feature_df)
+        
+    def plot_analysis(self, results_df, feature_df):
+        try:
+            # 1. IC Bar Plot
+            plt.figure(figsize=(12, 8))
+            # Sort for plotting
+            plot_df = results_df.sort_values("IC", ascending=True)
+            colors = ['red' if x < 0 else 'blue' for x in plot_df["IC"]]
+            plt.barh(plot_df["Feature"], plot_df["IC"], color=colors)
+            plt.title("Information Coefficient (IC) by Factor")
+            plt.xlabel("IC Value")
+            plt.tight_layout()
+            plt.savefig("factor_ic.png")
+            print("Saved plot: factor_ic.png")
+            
+            # 2. Correlation Matrix
+            plt.figure(figsize=(10, 10))
+            corr = feature_df.corr()
+            plt.imshow(corr, cmap='coolwarm', vmin=-1, vmax=1)
+            plt.colorbar()
+            plt.xticks(range(len(corr)), corr.columns, rotation=90)
+            plt.yticks(range(len(corr)), corr.columns)
+            plt.title("Feature Correlation Matrix")
+            plt.tight_layout()
+            plt.savefig("feature_correlation.png")
+            print("Saved plot: feature_correlation.png")
+            
+        except Exception as e:
+            print(f"Factor plotting failed: {e}")
