@@ -51,32 +51,47 @@ python vendors/qlib/scripts/dump_bin.py dump_all \
 
 The project has been refactored into a modular architecture for better maintainability and scalability. The main entry point `run_etf_analysis.py` orchestrates the entire pipeline:
 
--   **`data.py`**: Handles data loading and feature engineering (calculating factors like Momentum, Volatility, RSI, MACD).
+-   **`data.py`**: Handles data loading and feature engineering (calculating optimized factors like Volatility, Momentum).
 -   **`model.py`**: Manages LightGBM model training and prediction.
--   **`backtest.py`**: Executes the `TopkDropoutStrategy` backtest using Qlib's engine.
+-   **`backtest.py`**: Executes the `SimpleTopkStrategy` with turnover control using Qlib's engine.
 -   **`analysis.py`**: Calculates metrics (Alpha, Sharpe, Drawdown) and generates visualization plots.
 
 **To run the complete analysis:**
 ```bash
-python run_etf_analysis.py
+python run_etf_analysis.py --topk 4
 ```
+
+**CLI Options:**
+-   `--topk`: Number of stocks to hold (default: 3).
 
 **What happens when you run this:**
 1.  **Initialization**: Qlib is initialized with local provider settings.
-2.  **Data Loading**: Historical ETF data is loaded, and 13 technical factors (including RSI, MACD, Volatility) are computed.
-3.  **Model Training**: A LightGBM model trains on data from 2018-2020 to predict future returns.
-4.  **Backtest**: The `TopkDropoutStrategy` (Top 3, Drop 1) is simulated on the test period (2021-2022).
-5.  **Analysis**:
-    -   Metrics are printed to the console (Annualized Return, Max Drawdown, Turnover).
-    -   **Plots Generated**: `cumulative_return.png` and `excess_return.png`.
-    -   **Reports Saved**: `backtest_report.pkl`, `backtest_positions.pkl`, `backtest_analysis.pkl`.
+2.  **Data Loading**: Historical ETF data (2015-2025) is loaded.
+3.  **Feature Engineering**: Computes 6 optimized factors (Volatility, Momentum, Liquidity).
+4.  **Model Training**: A LightGBM model trains on data (2015-2023) to predict future returns.
+5.  **Signal Processing**: Applies **10-day EWMA Smoothing** to stabilize predictions.
+6.  **Backtest**: The `SimpleTopkStrategy` (Top 4, 96% Retention) is simulated on the test period (2024-2025).
+7.  **Analysis**:
+    -   Prints metrics (Annualized Return, Drawdown, Turnover).
+    -   Generates plots (`cumulative_return.png`).
+    -   Saves reports to `artifacts/`.
 
-### 4. Strategy Details
+### 4. Strategy Details (Aggressive Turnover Reduction)
 
--   **Model**: LightGBM (Gradient Boosting)
+-   **Model**: LightGBM (Gradient Boosting) with optimized hyperparameters.
 -   **Target**: Next day return (`Ref($close, -1) / $close - 1`)
--   **Features**: Market Cap, Momentum (20/60/120 days), Volatility, RSI, MACD, Volume Ratios.
--   **Strategy**: `TopkDropoutStrategy`
-    -   **Top K**: Holds the top 3 ETFs with highest predicted scores.
-    -   **N Drop**: Replaces 1 ETF per rebalancing period to ensure portfolio freshness.
-    -   **Rebalancing**: Daily.
+-   **Features**:
+    -   **Predictive**: 60-day & 20-day Volatility (Positive Correlation).
+    -   **Trend**: 60-day & 120-day Momentum.
+    -   **Reversal**: 5-day Reversal (`REV5`).
+    -   **Liquidity**: Log Market Cap (`SIZE`).
+-   **Strategy**: `SimpleTopkStrategy` (Robust Version)
+    -   **Top K**: Holds the top 4 ETFs.
+    -   **Turnover Control**:
+        -   **Probabilistic Retention**: 96% probability of **skipping** trades daily to hold positions longer.
+        -   **Smoothing**: 10-day Exponential Weighted Moving Average (EWMA) to filter signal noise.
+        -   **Swap Limit**: Max 1 stock replacement per trading opportunity.
+    -   **Performance (2024-2025)**:
+        -   **Return**: ~14%
+        -   **Turnover**: < 500% (Low Cost)
+        -   **Sharpe**: ~0.76

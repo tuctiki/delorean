@@ -12,7 +12,7 @@ def parse_args() -> argparse.Namespace:
     Parse command line arguments.
     """
     parser = argparse.ArgumentParser(description="Run ETF Strategy Analysis")
-    parser.add_argument("--topk", type=int, default=3, help="Number of stocks to hold in TopK strategy (default: 3)")
+    parser.add_argument("--topk", type=int, default=4, help="Number of stocks to hold in TopK strategy (default: 4)")
     return parser.parse_args()
 
 def main() -> None:
@@ -44,7 +44,7 @@ def main() -> None:
         feature_imp = model_trainer.get_feature_importance(dataset)
         print("\nTop 10 Feature Importance:\n", feature_imp.head(10))
 
-        # Signal Smoothing (Experiment 4 + Aggressive 10-day EWMA)
+        # Signal Smoothing
         print("Applying 10-day EWMA Signal Smoothing...")
         # Check index names (usually datetime, instrument)
         if pred.index.names[1] == 'instrument':
@@ -73,8 +73,8 @@ def main() -> None:
 
         # 4. Backtest
         backtest_engine = BacktestEngine(pred)
-        # Pass updated robust params (TopK=4, DropRate=0.96, NDrop=1)
-        report, positions = backtest_engine.run(topk=4, drop_rate=0.96, n_drop=1)
+        # Pass updated robust params (TopK=args.topk, DropRate=0.96, NDrop=1)
+        report, positions = backtest_engine.run(topk=args.topk, drop_rate=0.96, n_drop=1)
 
         # 5. Analysis
         analyzer = ResultAnalyzer()
