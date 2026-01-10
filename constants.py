@@ -1,8 +1,9 @@
-# constants.py
+from qlib.config import REG_CN
 
+# ETF List
 ETF_LIST = [
     "510300.SH",    # 沪深300ETF
-    "159339.SH",    # 原A500；若样本少，替换为 "159352.SH" (南方，规模大) 或 "512050.SH" (华夏) 或 "560530.SH" (摩根) 或 "563220.SH" (富国)
+    "512050.SH",    # 中证A500ETF (华夏)
     "512480.SH",    # 半导体
     "516160.SH",    # 新能源车
     "512690.SH",    # 白酒
@@ -12,3 +13,13 @@ ETF_LIST = [
     "515790.SH",    # 光伏
     "512880.SH",    # 证券
 ]
+
+# Time Range
+START_TIME = "2018-01-01"
+END_TIME = "2022-12-31"
+TRAIN_END_TIME = "2020-12-31"
+TEST_START_TIME = "2021-01-01"
+
+# Qlib Config
+QLIB_PROVIDER_URI = '~/.qlib/qlib_data/cn_etf_data'
+QLIB_REGION = REG_CN
