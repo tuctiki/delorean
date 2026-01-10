@@ -1,3 +1,4 @@
+import argparse
 import qlib
 from constants import QLIB_PROVIDER_URI, QLIB_REGION
 from data import ETFDataLoader
@@ -6,7 +7,20 @@ from backtest import BacktestEngine
 from analysis import ResultAnalyzer, FactorAnalyzer
 from qlib.workflow import R
 
-if __name__ == "__main__":
+def parse_args() -> argparse.Namespace:
+    """
+    Parse command line arguments.
+    """
+    parser = argparse.ArgumentParser(description="Run ETF Strategy Analysis")
+    parser.add_argument("--topk", type=int, default=3, help="Number of stocks to hold in TopK strategy (default: 3)")
+    return parser.parse_args()
+
+def main() -> None:
+    """
+    Main execution function.
+    """
+    args = parse_args()
+
     # 1. Initialize Qlib
     qlib.init(provider_uri=QLIB_PROVIDER_URI, region=QLIB_REGION)
 
@@ -45,8 +59,12 @@ if __name__ == "__main__":
 
         # 4. Backtest
         backtest_engine = BacktestEngine(pred)
-        report, positions = backtest_engine.run()
+        # Pass topk from arguments
+        report, positions = backtest_engine.run(topk=args.topk)
 
         # 5. Analysis
         analyzer = ResultAnalyzer()
         analyzer.process(report, positions)
+
+if __name__ == "__main__":
+    main()

@@ -1,12 +1,23 @@
+from typing import Dict, Any, Optional
 from qlib.contrib.evaluate import risk_analysis
+from qlib.data.dataset import DatasetH
 import pandas as pd
 import matplotlib.pyplot as plt
-
 from constants import OUTPUT_DIR
 import os
 
 class ResultAnalyzer:
-    def process(self, report, positions):
+    """
+    Analyzes backtest results, calculates metrics, and generates visualizations.
+    """
+    def process(self, report: pd.DataFrame, positions: Dict[Any, Any]) -> None:
+        """
+        Process the backtest report and positions.
+
+        Args:
+            report (pd.DataFrame): Daily backtest report containing return, account value, turnover, etc.
+            positions (dict): Daily position details.
+        """
         # Calculate risk analysis
         analysis = risk_analysis(report["return"], freq="day")
 
@@ -21,7 +32,6 @@ class ResultAnalyzer:
 
         # Turnover
         # Use the pre-calculated turnover rate from Qlib
-        # total_turnover is likely cumulative or just value, but 'turnover' is the rate
         turnover_rate = report["turnover"]
         avg_turnover = turnover_rate.mean() * 252 # Annualized
         print(f"\nAnnualized Turnover (Avg): {avg_turnover:.2%}")
@@ -32,7 +42,14 @@ class ResultAnalyzer:
 
         self.analyze_results(report, analysis)
 
-    def analyze_results(self, report, risk_metrics):
+    def analyze_results(self, report: pd.DataFrame, risk_metrics: pd.DataFrame) -> None:
+        """
+        Print formatted metrics and generate plots.
+
+        Args:
+            report (pd.DataFrame): Backtest report.
+            risk_metrics (pd.DataFrame): Risk analysis DataFrame from qlib.
+        """
         print("\n=== Detailed Backtest Analysis ===")
         
         # 1. Metrics
@@ -77,44 +94,40 @@ class ResultAnalyzer:
             plt.savefig(os.path.join(OUTPUT_DIR, "excess_return.png"))
             print(f"Saved plot: {os.path.join(OUTPUT_DIR, 'excess_return.png')}")
 
-
         except Exception as e:
             print(f"Plotting failed: {e}")
 
 class FactorAnalyzer:
-    def analyze(self, dataset):
+    """
+    Analyzes the predictive power of features (IC/RankIC).
+    """
+    def analyze(self, dataset: DatasetH) -> None:
+        """
+        Calculate and print Information Coefficient (IC) for each feature.
+
+        Args:
+            dataset (DatasetH): The Qlib dataset object.
+        """
         print("\n=== Factor Impact Analysis ===")
         
         # 1. Prepare Data
-        # We need the dataframe with features and label
-        # segments["train"] is typically used for analysis
         df = dataset.prepare("train")
         
         # Separate features and label
         label_col = "Ref($close, -1) / $close - 1"
         if label_col not in df.columns:
-            # Try to find the label column (it might be named differently or is the last column)
-            # In Qlib, labels are often handled separately or named 'label' in some contexts,
-            # but here we defined it explicitly. Let's check columns.
-            # Usually dataset.prepare returns features. The label might be in a separate handler?
-            # Actually, DataHandlerLP prepares both.
-            # Let's inspect columns effectively.
-            # "feature" columns are under 'feature' multiindex level if applicable, or flat.
+            # If label is not directly found, it might be separate. 
+            # Ideally Qlib handles this, but here we assume standard handler config.
             pass
 
-
-
         # Calculate IC and RankIC
-        ic_data = []
-        
         # If MultiIndex columns (feature, label)
         if isinstance(df.columns, pd.MultiIndex):
             feature_df = df["feature"]
             label_df = df["label"]
-            # Assuming single label
             label = label_df.iloc[:, 0]
         else:
-            # Handle flat columns
+            # Handle flat columns (fallback)
             if label_col in df.columns:
                 label = df[label_col]
                 # Filter out label to get features
@@ -130,7 +143,7 @@ class FactorAnalyzer:
         for feature_name in feature_df.columns:
             feature_val = feature_df[feature_name]
             
-            # Algin indices
+            # Align indices
             msg_df = pd.DataFrame({"feature": feature_val, "label": label}).dropna()
             
             if len(msg_df) < 10:
@@ -160,7 +173,10 @@ class FactorAnalyzer:
         
         self.plot_analysis(results_df, feature_df)
         
-    def plot_analysis(self, results_df, feature_df):
+    def plot_analysis(self, results_df: pd.DataFrame, feature_df: pd.DataFrame) -> None:
+        """
+        Generate plots for factor analysis (IC bar chart, Correlation matrix).
+        """
         try:
             # 1. IC Bar Plot
             plt.figure(figsize=(12, 8))
