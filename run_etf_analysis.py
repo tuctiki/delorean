@@ -56,6 +56,9 @@ def main() -> None:
         # Note: groupby(level=...).apply(...) often prepends the group key to the index.
         # Original index: (datetime, instrument)
         # Result index: (instrument, datetime, instrument) -> we need to drop top level.
+        # 2. Time-Series Smoothing (EWMA on Raw Scores)
+        # Reverting to Raw Score + 10d EWMA (Apex Config).
+        # Rank smoothing removed to preserve magnitude signal.
         pred = pred.groupby(level=level_name).apply(
             lambda x: x.ewm(halflife=10, min_periods=1).mean()
         )
@@ -71,10 +74,30 @@ def main() -> None:
         # Safe Sort by datetime
         pred = pred.dropna().sort_index()
 
+        # --- Market Regime Filter (MA200) ---
+        print("Calculating Market Regime Signal (HS300 MA200)...")
+        from qlib.data import D
+        from constants import BENCHMARK, START_TIME, END_TIME
+        
+        # Load Benchmark Close Price
+        # D.features returns MultiIndex (instrument, datetime)
+        bench_df = D.features([BENCHMARK], ['$close'], start_time=START_TIME, end_time=END_TIME)
+        
+        # Compute MA200
+        # Reset index to get 'datetime' as column or index level for easier handling
+        bench_close = bench_df.droplevel(0) # Drop instrument level, now index is datetime
+        bench_close.columns = ['close']
+        
+        # Calculate Moving Average (MA60 for faster response)
+        bench_close['ma60'] = bench_close['close'].rolling(window=60).mean()
+        
+        # Define Regime: True = Bull (Close > MA60), False = Bear (Close <= MA60)
+        market_regime = bench_close['close'] > bench_close['ma60']
+        
         # 4. Backtest
         backtest_engine = BacktestEngine(pred)
-        # Pass updated robust params (TopK=args.topk, DropRate=0.96, NDrop=1)
-        report, positions = backtest_engine.run(topk=args.topk, drop_rate=0.96, n_drop=1)
+        # Pass updated robust params AND Market Regime (User Requested)
+        report, positions = backtest_engine.run(topk=args.topk, drop_rate=0.96, n_drop=1, market_regime=market_regime)
 
         # 5. Analysis
         analyzer = ResultAnalyzer()

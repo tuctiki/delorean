@@ -51,7 +51,7 @@ def get_trading_signal(topk=4):
     pred = model_trainer.predict(dataset)
     
     # 5. Signal Processing (EWMA)
-    print("[4/5] Applying 10-day EWMA Smoothing...")
+    print("[4/5] Applying 10-day EWMA Smoothing (Apex Config)...")
     if pred.index.names[1] == 'instrument':
         level_name = 'instrument'
     else:
@@ -75,6 +75,45 @@ def get_trading_signal(topk=4):
     latest_pred = pred.loc[latest_date]
     latest_pred = latest_pred.sort_values(ascending=False)
     
+    # --- Market Regime Check (Live) ---
+    print("\n[Market Regime Check]")
+    from qlib.data import D
+    from constants import BENCHMARK
+    
+    # Fetch last 300 days of benchmark to be safe
+    # Qlib 'start_time' needs string or pd.Timestamp
+    # Using relative date
+    bench_start_check = latest_date - pd.Timedelta(days=400)
+    bench_df = D.features([BENCHMARK], ['$close'], start_time=bench_start_check, end_time=latest_date)
+    
+    if not bench_df.empty:
+        bench_close = bench_df.droplevel(0)
+        bench_close.columns = ['close']
+        bench_close['ma60'] = bench_close['close'].rolling(window=60).mean()
+        
+        # Latest regime
+        try:
+            last_close = bench_close.loc[latest_date, 'close']
+            last_ma60 = bench_close.loc[latest_date, 'ma60']
+            is_bull = last_close > last_ma60
+            
+            print(f"Benchmark ({BENCHMARK}) Close: {last_close:.2f}")
+            print(f"Benchmark MA60: {last_ma60:.2f}")
+            
+            if not is_bull:
+                print("\n" + "!"*40)
+                print("WARNING: BEAR MARKET DETECTED (Price < MA60)")
+                print("STRATEGY RECOMMENDATION: LIQUIDATE ALL (CASH)")
+                print("!"*40)
+                # Override output? Or just warn. 
+                # Better to just warn heavily but still show relative ranks if user insists.
+            else:
+                print("Status: BULL Market (Price > MA60). Trading Active.")
+        except KeyError:
+             print("Warning: Could not calculate MA60 for latest date (Data missing?). Assuming Bull.")
+    else:
+        print("Warning: Benchmark data not found.")
+
     print("\n" + "-"*30)
     print(f"  Top {topk} Recommendations")
     print("-" * 30)
@@ -89,7 +128,8 @@ def get_trading_signal(topk=4):
     print("\n[Strategy Note]")
     print(f"- Target Hold: Top {topk}")
     print(f"- Turnover Control: Only swap if you hold a low-ranked ETF.")
-    print("- Aggressive Filter: 'n_drop=1' (Max 1 swap recommend per day).")
+    print("- Aggressive Filter: 'n_drop=1'.")
+    print("- Regime Filter: If Bear Market Warning above, prefer CASH.")
 
 if __name__ == "__main__":
     get_trading_signal()

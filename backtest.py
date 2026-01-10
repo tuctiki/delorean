@@ -37,25 +37,42 @@ class SimpleTopkStrategy(BaseSignalStrategy):
                            User terminology: "dropout_rate" ~96% -> 96% chance keep old.
         n_drop (int): Maximum number of stocks to swap per trading step if trading occurs.
     """
-    def __init__(self, topk: int = 4, risk_degree: float = 0.95, drop_rate: float = 0.96, n_drop: int = 1, **kwargs: Any):
+    def __init__(self, topk: int = 4, risk_degree: float = 0.95, drop_rate: float = 0.96, n_drop: int = 1, market_regime: pd.Series = None, **kwargs: Any):
         super().__init__(risk_degree=risk_degree, **kwargs)
         self.topk = topk
         self.drop_rate = drop_rate
         self.n_drop = n_drop
+        self.market_regime = market_regime
 
     def generate_trade_decision(self, execute_result: Any = None) -> TradeDecisionWO:
         """
-        Generate trade orders with turnover control.
+        Generate trade orders with turnover control and market regime filter.
         """
-        # 0. turnover control: Probabilistic Retention
-        # If random < drop_rate, we SKIP trading this step (hold existing)
-        # This aligns with user request: "95-98% probability keep old position"
-        if random.random() < self.drop_rate:
-            return TradeDecisionWO([], self)
-
         # 1. Get Trading Step and Time
         trade_step = self.trade_calendar.get_trade_step()
         trade_start_time, trade_end_time = self.trade_calendar.get_step_time(trade_step)
+
+        # 0. Market Regime Filter (Bear Market Defense)
+        # If market_regime provided and False (Bear), Liquidate All.
+        if self.market_regime is not None:
+            # Check if current date (trade_start_time) is in Bear market
+            # Regime series index should be datetime
+            # We use 'asof' or direct lookup
+            try:
+                # Assuming index is pd.Timestamp
+                is_bull = self.market_regime.loc[trade_start_time] if trade_start_time in self.market_regime.index else True
+            except:
+                is_bull = True # Default to Bull if data missing
+            
+            if not is_bull:
+                # BEAR MARKET: Sell Everything, Buy Nothing.
+                return TradeDecisionWO(self._generate_sell_orders(self.trade_position, pd.Index([]), trade_start_time, trade_end_time), self)
+
+        # 0.5 Turnover control: Probabilistic Retention
+        # If random < drop_rate, we SKIP trading this step (hold existing)
+        # Only applies in Bull Market (if we are here)
+        if random.random() < self.drop_rate:
+            return TradeDecisionWO([], self)
         
         # 2. Get Scores
         pred_score = self._get_pred_scores(trade_step)
@@ -278,24 +295,26 @@ class BacktestEngine:
         """
         self.pred = pred
 
-    def run(self, topk: int = 3, **kwargs: Any) -> Tuple[pd.DataFrame, Dict[Any, Any]]:
+    def run(self, topk: int = 3, market_regime: pd.Series = None, **kwargs: Any) -> Tuple[pd.DataFrame, Dict[Any, Any]]:
         """
         Run the backtest simulation.
 
         Args:
             topk (int): Number of stocks to hold in the TopK strategy.
+            market_regime (pd.Series): Boolean series (True=Bull, False=Bear) to filter trades.
             **kwargs: Additional strategy parameters (drop_rate, n_drop).
 
         Returns:
             Tuple[pd.DataFrame, dict]: A tuple containing the backtest report DataFrame 
             and a dictionary of position details.
         """
-        print(f"\nRunning Backtest (Experiment 3+: Custom SimpleTopkStrategy, TopK={topk}, Params={kwargs})...")
+        print(f"\nRunning Backtest (Custom SimpleTopkStrategy, TopK={topk}, RegimeFilter={'On' if market_regime is not None else 'Off'}, Params={kwargs})...")
         # Strategy Config
         STRATEGY_CONFIG = {
             "topk": topk,
             "risk_degree": 0.95,
             "signal": self.pred,
+            "market_regime": market_regime,
             **kwargs # Pass drop_rate and n_drop
         }
 
@@ -319,11 +338,24 @@ class BacktestEngine:
         strategy_obj = SimpleTopkStrategy(**STRATEGY_CONFIG)
         executor_obj = qlib_executor.SimulatorExecutor(**EXECUTOR_CONFIG["kwargs"])
 
+        # Determine Backtest End Time
+        # The backtest engine's calendar logic requires the 'next' step to exist to define the interval.
+        # If we run until the absolute last available date, get_step_time(i) tries to access i+1.
+        # So we must stop one step before the end of the data/calendar.
+        
+        valid_dates = self.pred.index.get_level_values('datetime').unique().sort_values()
+        if len(valid_dates) > 1:
+            # Use the second to last date as the safe end_time for simulation
+            # This ensures 'next day' exists in the calendar (which is the last date)
+            data_end_time = valid_dates[-2]
+        else:
+            data_end_time = valid_dates[-1]
+
         portfolio_metric_dict, indicator_dict = qlib_backtest(
             executor=executor_obj,
             strategy=strategy_obj,
             start_time=TEST_START_TIME,
-            end_time=END_TIME,
+            end_time=data_end_time,
             account=1000000,
             benchmark=BENCHMARK,
         )

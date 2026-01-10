@@ -13,6 +13,7 @@ ETF_LIST = [
     "510630.SH",    # 消费
     "515790.SH",    # 光伏
     "512880.SH",    # 证券
+    "510880.SH",    # 红利ETF (Defensive)
 ]
 
 # Benchmark
@@ -21,8 +22,8 @@ BENCHMARK = "510300.SH"
 # Time Range
 START_TIME = "2015-01-01"
 END_TIME = "2099-12-31" # Future-proof for live trading
-TRAIN_END_TIME = "2023-12-31"
-TEST_START_TIME = "2024-01-01"
+TRAIN_END_TIME = "2022-12-31"
+TEST_START_TIME = "2023-01-01"
 
 # Qlib Config
 QLIB_PROVIDER_URI = '~/.qlib/qlib_data/cn_etf_data'

@@ -29,9 +29,10 @@ class ETFDataHandler(DataHandlerLP):
                 "($close / Ref($close, 5) - 1) * -1",               # Short-term Reversal (REV5)
                 "Std($close / Ref($close, 1) - 1, 20)",             # 20-day Volatility (VOL20)
                 "Std($close / Ref($close, 1) - 1, 60)",             # 60-day Volatility (VOL60)
+                "Std($close / Ref($close, 1) - 1, 120)",            # Long-term Volatility (Defensive)
             ],
             "label": [
-                "Ref($close, -1) / $close - 1"  # Next Day Return
+                "Ref($close, -1) / $close - 1"  # Next Day Return (Restored)
             ],
         }
         data_loader = {
