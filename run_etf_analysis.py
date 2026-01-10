@@ -44,23 +44,37 @@ def main() -> None:
         feature_imp = model_trainer.get_feature_importance(dataset)
         print("\nTop 10 Feature Importance:\n", feature_imp.head(10))
 
-        # Signal Smoothing (Experiment 4)
-        # Apply 5-day Simple Moving Average to stabilize rankings and reduce turnover
-        print("Applying 5-day Signal Smoothing...")
+        # Signal Smoothing (Experiment 4 + Aggressive 10-day EWMA)
+        print("Applying 10-day EWMA Signal Smoothing...")
         # Check index names (usually datetime, instrument)
-        # If no index names, assume level 1 is instrument
         if pred.index.names[1] == 'instrument':
             level_name = 'instrument'
         else:
             level_name = pred.index.names[1]
             
-        pred = pred.groupby(level=level_name).rolling(5).mean().reset_index(level=0, drop=True)
+        # EWMA Smoothing (Halflife=10 days)
+        # Note: groupby(level=...).apply(...) often prepends the group key to the index.
+        # Original index: (datetime, instrument)
+        # Result index: (instrument, datetime, instrument) -> we need to drop top level.
+        pred = pred.groupby(level=level_name).apply(
+            lambda x: x.ewm(halflife=10, min_periods=1).mean()
+        )
+        
+        # Remove redundant level 0 if added
+        if pred.index.nlevels > 2:
+            pred = pred.droplevel(0)
+            
+        # Ensure (datetime, instrument) order
+        if pred.index.names[0] != 'datetime' and 'datetime' in pred.index.names:
+             pred = pred.swaplevel()
+             
+        # Safe Sort by datetime
         pred = pred.dropna().sort_index()
 
         # 4. Backtest
         backtest_engine = BacktestEngine(pred)
-        # Pass topk from arguments
-        report, positions = backtest_engine.run(topk=args.topk)
+        # Pass updated robust params (TopK=4, DropRate=0.96, NDrop=1)
+        report, positions = backtest_engine.run(topk=4, drop_rate=0.96, n_drop=1)
 
         # 5. Analysis
         analyzer = ResultAnalyzer()

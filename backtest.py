@@ -24,16 +24,35 @@ class SimpleTopkStrategy(BaseSignalStrategy):
         super().__init__(risk_degree=risk_degree, **kwargs)
         self.topk = topk
 
+import random
+
+class SimpleTopkStrategy(BaseSignalStrategy):
+    """
+    Robust TopK strategy with probabilistic retention to drastically reduce turnover.
+    
+    Attributes:
+        topk (int): Number of stocks to hold.
+        risk_degree (float): Percentage of capital to invest.
+        drop_rate (float): Probability of **keeping** existing positions (skipping trading). 
+                           User terminology: "dropout_rate" ~96% -> 96% chance keep old.
+        n_drop (int): Maximum number of stocks to swap per trading step if trading occurs.
+    """
+    def __init__(self, topk: int = 4, risk_degree: float = 0.95, drop_rate: float = 0.96, n_drop: int = 1, **kwargs: Any):
+        super().__init__(risk_degree=risk_degree, **kwargs)
+        self.topk = topk
+        self.drop_rate = drop_rate
+        self.n_drop = n_drop
+
     def generate_trade_decision(self, execute_result: Any = None) -> TradeDecisionWO:
         """
-        Generate trade orders for the current step.
-
-        Args:
-            execute_result: Previous execution result (unused in this strategy).
-
-        Returns:
-            TradeDecisionWO: A decision object containing a list of orders.
+        Generate trade orders with turnover control.
         """
+        # 0. turnover control: Probabilistic Retention
+        # If random < drop_rate, we SKIP trading this step (hold existing)
+        # This aligns with user request: "95-98% probability keep old position"
+        if random.random() < self.drop_rate:
+            return TradeDecisionWO([], self)
+
         # 1. Get Trading Step and Time
         trade_step = self.trade_calendar.get_trade_step()
         trade_start_time, trade_end_time = self.trade_calendar.get_step_time(trade_step)
@@ -44,22 +63,119 @@ class SimpleTopkStrategy(BaseSignalStrategy):
             return TradeDecisionWO([], self)
             
         # 3. Determine Target Stocks (Top K)
-        target_stocks = self._get_target_stocks(pred_score)
+        # We need the full sorted list to find best replacements if needed
+        sorted_score = pred_score.sort_values(ascending=False)
+        target_stocks = sorted_score.head(self.topk).index
         
         # 4. Current Position Snapshot
         current_temp = copy.deepcopy(self.trade_position)
+        current_stock_list = current_temp.get_stock_list()
         
-        # 5. Generate Orders
-        sell_orders = self._generate_sell_orders(current_temp, target_stocks, trade_start_time, trade_end_time)
+        # 5. Sell Logic with n_drop limit
+        # Identify stocks we hold that are NOT in target
+        hold_not_in_target = [code for code in current_stock_list if code not in target_stocks]
         
-        # Update position after sell (simulated)
-        for order in sell_orders:
-            # Note: deal_order updates the position object in-place (current_temp)
-            self.trade_exchange.deal_order(order, position=current_temp)
+        # If we have valid holdings, we only want to drop 'n_drop' of them
+        # Sort them by score (lowest score first) to drop the worst ones
+        # If score is missing, assuming worst
         
-        buy_orders = self._generate_buy_orders(current_temp, target_stocks, trade_start_time, trade_end_time)
+        # Get scores for held stocks
+        # Create a dict for lookups
+        score_map = pred_score.to_dict()
         
-        return TradeDecisionWO(sell_orders + buy_orders, self)
+        # Sort held_not_in_target by score (ascending: drop worst)
+        hold_not_in_target.sort(key=lambda x: score_map.get(x, -9999))
+        
+        # Select ones to actually drop (limit by n_drop)
+        to_drop = hold_not_in_target[:self.n_drop]
+        
+        # Also, we might have slots if we currently hold < topk
+        # But wait, if we drop `to_drop`, we free up slots.
+        # What if we just sold everything not in target? That was previous logic (high turnover).
+        # New logic: Only sell `to_drop` list.
+        # AND: we keep `hold_not_in_target[self.n_drop:]` (these remain part of our "semi-target" for today)
+        
+        # Effective Target = (Target Intersect Current) + (Remaining Current) + (New Buys to fill TopK)
+        # Actually simpler: 
+        # 1. Sell `to_drop`.
+        # 2. Buy stocks from `target_stocks` that are NOT held, until we reach `topk`.
+        
+        sell_order_list = []
+        for code in to_drop:
+            if not self.trade_exchange.is_stock_tradable(stock_id=code, start_time=trade_start_time, end_time=trade_end_time, direction=OrderDir.SELL):
+                continue
+            
+            sell_amount = current_temp.get_stock_amount(code=code)
+            sell_order = Order(
+                stock_id=code,
+                amount=sell_amount,
+                start_time=trade_start_time,
+                end_time=trade_end_time,
+                direction=Order.SELL
+            )
+            if self.trade_exchange.check_order(sell_order):
+                sell_order_list.append(sell_order)
+                # Update temp position to free cash
+                self.trade_exchange.deal_order(sell_order, position=current_temp)
+
+        # 6. Buy Logic
+        # We want to fill up to `topk`.
+        # Current Count = (Original Count) - (Dropped Count)
+        # We need to buy (TopK - Current Count) new stocks?
+        # Ideally we pick the best ones from `target_stocks` that we don't hold.
+        
+        buy_order_list = []
+        
+        current_holdings_after_sell = current_temp.get_stock_list()
+        slots_available = self.topk - len(current_holdings_after_sell)
+        
+        if slots_available > 0:
+            # Pick best candidates from target_stocks not currently held
+            candidates = [s for s in target_stocks if s not in current_holdings_after_sell]
+            # Since target_stocks is already topk sorted, just take top `slots_available`
+            to_buy = candidates[:slots_available]
+            
+            # Calculate target value per stock
+            # We assume equal weight among ALL held stocks (roughly)
+            # Or just allocate available cash to new buys?
+            # User wants "small adjustments". Allocating available cash is safer/lower turnover than rebalancing everything.
+            
+            cash = current_temp.get_cash()
+            # If we just allocate cash / count, it might drift.
+            # But let's try standard equal weight target for NEW/REBALANCING stocks?
+            # Let's stick to: Target Value = Total Asset * Risk / TopK
+            
+            current_value = current_temp.calculate_value()
+            target_value_per_stock = current_value * self.risk_degree / self.topk
+            
+            # Rebalance Phase: Check buys (fill gaps)
+            # We focus on `to_buy` list mostly, but we could also check held stocks for drift?
+            # To minimize turnover, let's ONLY buy the new ones for now, and rely on `n_drop` cycle to rotate.
+            # Rebalancing existing positions adds turnover. Let's skip it unless necessary?
+            # Let's add them to `to_buy`.
+            
+            for code in to_buy:
+                if not self.trade_exchange.is_stock_tradable(stock_id=code, start_time=trade_start_time, end_time=trade_end_time, direction=OrderDir.BUY):
+                    continue
+                
+                current_price = self.trade_exchange.get_deal_price(stock_id=code, start_time=trade_start_time, end_time=trade_end_time, direction=OrderDir.BUY)
+                target_amount = target_value_per_stock / current_price
+                
+                # We hold 0, so buy target_amount
+                factor = self.trade_exchange.get_factor(stock_id=code, start_time=trade_start_time, end_time=trade_end_time)
+                buy_amount = self.trade_exchange.round_amount_by_trade_unit(target_amount, factor)
+                
+                if buy_amount > 0:
+                    buy_order = Order(
+                        stock_id=code,
+                        amount=buy_amount,
+                        start_time=trade_start_time,
+                        end_time=trade_end_time,
+                        direction=OrderDir.BUY
+                    )
+                    buy_order_list.append(buy_order)
+
+        return TradeDecisionWO(sell_order_list + buy_order_list, self)
 
     def _get_pred_scores(self, trade_step: int) -> Optional[pd.Series]:
         """Fetch prediction scores for the next trading day (shift=1)."""
@@ -162,23 +278,25 @@ class BacktestEngine:
         """
         self.pred = pred
 
-    def run(self, topk: int = 3) -> Tuple[pd.DataFrame, Dict[Any, Any]]:
+    def run(self, topk: int = 3, **kwargs: Any) -> Tuple[pd.DataFrame, Dict[Any, Any]]:
         """
         Run the backtest simulation.
 
         Args:
             topk (int): Number of stocks to hold in the TopK strategy.
+            **kwargs: Additional strategy parameters (drop_rate, n_drop).
 
         Returns:
             Tuple[pd.DataFrame, dict]: A tuple containing the backtest report DataFrame 
             and a dictionary of position details.
         """
-        print(f"\nRunning Backtest (Experiment 3: Custom SimpleTopkStrategy, TopK={topk})...")
+        print(f"\nRunning Backtest (Experiment 3+: Custom SimpleTopkStrategy, TopK={topk}, Params={kwargs})...")
         # Strategy Config
         STRATEGY_CONFIG = {
             "topk": topk,
             "risk_degree": 0.95,
             "signal": self.pred,
+            **kwargs # Pass drop_rate and n_drop
         }
 
         EXECUTOR_CONFIG = {
