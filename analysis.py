@@ -20,10 +20,15 @@ class ResultAnalyzer:
         print(f"\nBacktest results saved to pkl files in {OUTPUT_DIR}.")
 
         # Turnover
-        # Calculate turnover rate: total_turnover / value
-        turnover_rate = report["total_turnover"] / report["value"]
+        # Use the pre-calculated turnover rate from Qlib
+        # total_turnover is likely cumulative or just value, but 'turnover' is the rate
+        turnover_rate = report["turnover"]
         avg_turnover = turnover_rate.mean() * 252 # Annualized
         print(f"\nAnnualized Turnover (Avg): {avg_turnover:.2%}")
+        
+        # Debug print to verify
+        print("Tail of report columns (turnover check):")
+        print(report[["total_turnover", "turnover"]].tail())
 
         self.analyze_results(report, analysis)
 

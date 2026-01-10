@@ -8,19 +8,11 @@ class ETFDataHandler(DataHandlerLP):
         data_loader_config = {
             "feature": [
                 "Log(Mean($volume * $close, 20))",                  # Market Cap / Liquidity Proxy
-                # "$close / Ref($close, 20) - 1",                 # 20-day Momentum (Removed: Low IC)
-                "$close / Ref($close, 60) - 1",                 # 60-day Momentum
-                "$close / Ref($close, 120) - 1",               # 120-day Momentum
-                # "($close / Ref($close, 5) - 1) * -1",                # 5-day Reversal (Removed: Low IC)
-                "Std($close / Ref($close, 1) - 1, 20)",         # 20-day Volatility
-                "Std($close / Ref($close, 1) - 1, 60)",         # 60-day Volatility
-                # "$volume / Mean($volume, 20)",                       # Short-term Volume Ratio (Removed: Low IC)
-                # "$volume / Mean($volume, 60)",                       # Medium-term Volume Ratio (Removed: Low IC)
-                # "Skew($close / Ref($close, 1) - 1, 20)",       # 20-day Skewness (Removed: Low IC)
-                # New Optimized Features
-                # "(EMA($close, 12) - EMA($close, 26)) / $close",      # MACD Trend (Normalized) (Removed: Negative IC)
-                # "100 * EMA(($close > Ref($close, 1)) * ($close - Ref($close, 1)), 14) / EMA(Abs($close - Ref($close, 1)), 14)", # RSI 14 (Approx) (Removed: Low IC)
-                # "($close / Ref($close, 20) - 1) / Std($close / Ref($close, 1) - 1, 20)", # Vol-Adjusted Momentum (Removed: Low IC)
+                "$close / Ref($close, 60) - 1",                     # Medium-term Momentum (MOM60)
+                "$close / Ref($close, 120) - 1",                    # Long-term Momentum (MOM120)
+                "($close / Ref($close, 5) - 1) * -1",               # Short-term Reversal (REV5)
+                "Std($close / Ref($close, 1) - 1, 20)",             # 20-day Volatility (VOL20)
+                "Std($close / Ref($close, 1) - 1, 60)",             # 60-day Volatility (VOL60)
             ],
             "label": [
                 "Ref($close, -1) / $close - 1"  # Next Day Return

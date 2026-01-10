@@ -8,25 +8,24 @@ class ModelTrainer:
         self.model = None
 
     def train(self, dataset):
-        print("\nUsing LightGBM Model (Optimized)...")
+        print("\nUsing LightGBM Model (Optimized - Exp 8)...")
         self.model = LGBModel(
             loss="mse",
             colsample_bytree=0.887,
-            learning_rate=0.02,
+            learning_rate=0.05,          # Accelerated convergence
             subsample=0.7,
-            lambda_l1=1,
-            lambda_l2=1,
+            lambda_l1=0.5,               # Relaxed regularization
+            lambda_l2=0.5,
             max_depth=-1,
-            num_leaves=20,
-            min_data_in_leaf=50,
-            early_stopping_rounds=50,
+            num_leaves=31,               # Increased complexity
+            min_data_in_leaf=30,         # Reduced minimum data
+            early_stopping_rounds=100,   # Increased patience
+            num_boost_round=1000,        # More iterations
         )
         
         print("Starts training...")
         # Note: Recorder context should be handled effectively by the caller if needed, 
-        # or we can pass the recorder in. For simplicty here, we assume R.start is managed externally or we just fit.
-        # However, typically R.start is a context manager. 
-        # Let's assume the orchestration layer manages the experiment context.
+        # but LGBModel handles fit(dataset) natively with DatasetH.
         self.model.fit(dataset)
 
     def predict(self, dataset):
