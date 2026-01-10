@@ -80,3 +80,66 @@ test_label = dataset.prepare("test", col_set="label")
 print("\n测试集标签示例（前10行）:\n", test_label.head(10))
 
 print("\n训练集因子相关性:\n", train_features.corr().round(2))
+
+# ==========================================
+# 步骤4: Alpha 模型构建（LightGBM）
+# ==========================================
+from qlib.contrib.model.gbdt import LGBModel
+from qlib.workflow import R
+from qlib.workflow.record_temp import SignalRecord, PortAnaRecord
+import pandas as pd
+import matplotlib.pyplot as plt
+
+# 定义LightGBM模型
+model = LGBModel(
+    loss="mse",               # 回归任务，预测收益
+    colsample_bytree=0.887,   # 默认超参
+    learning_rate=0.05,
+    subsample=0.7,
+    lambda_l1=1,
+    lambda_l2=1,
+    max_depth=-1,
+    num_leaves=31,
+    min_data_in_leaf=20,
+    early_stopping_rounds=50,
+)
+
+# 使用Qlib Recorder记录实验
+# 使用 context manager 自动管理 run 的生命周期
+print("\n开始训练 LightGBM 模型...")
+with R.start(experiment_name="ETF_Strategy") as recorder:
+    # 训练模型
+    model.fit(dataset)
+
+    # 生成测试集预测分数
+    print("生成测试集预测分数...")
+    pred = model.predict(dataset)
+    # pred columns usually is 'score'
+
+    # 保存预测记录
+    R.save_objects(pred=pred)
+
+    # 特征重要性
+    feature_importance = pd.DataFrame({
+        'feature': dataset.prepare("train", col_set="feature").columns,
+        'importance': model.get_feature_importance()
+    }).sort_values('importance', ascending=False)
+
+    print("\n特征重要性（前10）:\n", feature_importance.head(10))
+
+    # 绘制重要性图 (如果支持显示)
+    try:
+        plt.figure(figsize=(10, 6))
+        plt.bar(feature_importance['feature'][:10], feature_importance['importance'][:10])
+        plt.xticks(rotation=45, ha='right')
+        plt.title("LightGBM Factor Importance Top 10")
+        plt.tight_layout()
+        # plt.show() # Skip show to avoid blocking in non-interactive environment
+        print("特征重要性图绘制完成 (skipped plt.show())")
+    except Exception as e:
+        print(f"绘图失败: {e}")
+
+    # 查看测试集预测示例
+    print("\n测试集预测分数示例（前20行）:\n", pred.head(20))
+
+print("模型构建完成。")

@@ -127,3 +127,9 @@ dmypy.json
 
 # Qlib source code
 vendors/qlib/
+
+# Qlib/MLflow artifacts
+mlruns/
+Users/
+.DS_Store
+*.csv

@@ -49,17 +49,33 @@ python vendors/qlib/scripts/dump_bin.py dump_all \
 
 ### 3. Analyze and Preprocess ETF Data
 
-This script serves as the main entry point for data analysis and preprocessing. It loads the Qlib binary data, performs feature engineering, and preprocesses the data into a `DatasetH` object, which is ready for model training or backtesting. It also demonstrates how to access both raw and preprocessed data.
+The `etf_analyzer.py` script serves as the core analysis module. It loads the Qlib binary data, performs feature engineering (calculating factors like momentum, volatility, etc.), and preprocesses the data into a `DatasetH` object.
 
--   **Script**: `etf_analyzer.py`
+-   **Script**: `etf_analyzer.py` (executed via `run_etf_analysis.py`)
 -   **Purpose**:
-    *   Initializes Qlib to point to the `cn_etf_data` directory.
-    *   Demonstrates how to fetch raw ETF data using `qlib.data.D.features()`.
-    *   Defines a custom `ETFDataHandler` to load and preprocess data, including feature engineering and normalization.
-    *   Splits the data into training, validation, and testing segments (`DatasetH`).
-    *   Shows how to access the final, preprocessed features and labels from the `DatasetH` object.
+    *   Initializes Qlib environment.
+    *   Defines `ETFDataHandler` for factor calculation and labeling.
+    *   Splits data into training (2018-2020) and testing (2021-2022) sets.
+    *   Calculates 10 alpha factors (e.g., Mom20, Vol20, Reversal).
 
 **To run this step:**
 ```bash
-python etf_analyzer.py
+python run_etf_analysis.py
 ```
+*Note: We use `run_etf_analysis.py` as the entry point to ensure safe multiprocessing on macOS.*
+
+### 4. Build Alpha Model (LightGBM)
+
+The project includes an Alpha model construction step integrated into `etf_analyzer.py`. It uses LightGBM to predict future ETF returns based on the calculated factors.
+
+-   **Model**: LightGBM (Gradient Boosting Decision Tree)
+-   **Target**: Next day return (`Ref($close, -1) / $close - 1`)
+-   **Features**: 10 factors including Volume-Price trends, Momentum, Volatility, and Reversal.
+-   **Workflow**:
+    1.  Trains the model on the training set.
+    2.  Generates prediction scores (ranking scores) for the test set.
+    3.  Outputs feature importance to identify the most predictive factors.
+
+**Output Example:**
+-   **Feature Importance**: ranks factors like `Log(Mean($volume * $close, 20))` (Liquidity) and `$close / Ref($close, 20) - 1` (Momentum).
+-   **Prediction Scores**: Daily scores for each ETF, indicating relative expected performance.
