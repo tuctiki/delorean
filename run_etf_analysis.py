@@ -30,6 +30,19 @@ if __name__ == "__main__":
         feature_imp = model_trainer.get_feature_importance(dataset)
         print("\nTop 10 Feature Importance:\n", feature_imp.head(10))
 
+        # Signal Smoothing (Experiment 4)
+        # Apply 5-day Simple Moving Average to stabilize rankings and reduce turnover
+        print("Applying 5-day Signal Smoothing...")
+        # Check index names (usually datetime, instrument)
+        # If no index names, assume level 1 is instrument
+        if pred.index.names[1] == 'instrument':
+            level_name = 'instrument'
+        else:
+            level_name = pred.index.names[1]
+            
+        pred = pred.groupby(level=level_name).rolling(5).mean().reset_index(level=0, drop=True)
+        pred = pred.dropna().sort_index()
+
         # 4. Backtest
         backtest_engine = BacktestEngine(pred)
         report, positions = backtest_engine.run()
