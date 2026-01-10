@@ -91,7 +91,7 @@ def format_for_qlib(df: pd.DataFrame, symbol: str) -> pd.DataFrame:
 
 def main():
     start_date = "20150101" # YYYYMMDD format
-    end_date = "20260101"   # YYYYMMDD format
+    end_date = "20991231"   # Future date to fetch all available data
 
     # Define output directory for ETF data
     output_dir = os.path.expanduser("~/.qlib/csv_data/akshare_etf_data")

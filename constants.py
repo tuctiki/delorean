@@ -20,7 +20,7 @@ BENCHMARK = "510300.SH"
 
 # Time Range
 START_TIME = "2015-01-01"
-END_TIME = "2025-12-25"
+END_TIME = "2099-12-31" # Future-proof for live trading
 TRAIN_END_TIME = "2023-12-31"
 TEST_START_TIME = "2024-01-01"
 
