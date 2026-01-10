@@ -1,130 +1,82 @@
-# etf_analyzer.py
+# 导入（接前步骤）
+from qlib.data.dataset.processor import CSZScoreNorm, DropnaLabel
+from qlib.contrib.data.loader import QlibDataLoader
 
-import qlib
-from qlib.constant import REG_CN
-from qlib.data import D
-from qlib.data.dataset import DatasetH
-from qlib.data.dataset.handler import DataHandlerLP
-from qlib.data.dataset.processor import DropnaLabel, CSZScoreNorm, DropnaProcessor
-import pandas as pd
-import traceback
+# 更新ETF列表（强烈建议将A500替换为主流代码"512050.SH"，规模大、数据完整）
+ETF_LIST = [
+    "510300.SH",    # 沪深300ETF
+    "512050.SH",    # 中证A500ETF（推荐替换为华夏主流代码，2026年规模超400亿；原159339.SH若数据少请换此）
+    "512480.SH",    # 半导体
+    "516160.SH",    # 新能源车
+    "512690.SH",    # 白酒
+    "512800.SH",    # 银行
+    "512010.SH",    # 医药
+    "510630.SH",    # 消费
+    "515790.SH",    # 光伏
+    "512880.SH",    # 证券
+]
 
-from constants import ETF_LIST
-
-def setup_qlib(provider_uri="~/.qlib/qlib_data/cn_etf_data", region=REG_CN):
-    """Initializes Qlib."""
-    try:
-        qlib.init(provider_uri=provider_uri, region=region)
-        print(f"Qlib initialized successfully, using provider: {provider_uri}")
-        return True
-    except Exception as e:
-        print(f"Qlib initialization failed: {e}")
-        print("Please ensure you have run the data download and conversion scripts as per the README.")
-        return False
-
+# 更新DataHandler：修正processors和label表达式
 class ETFDataHandler(DataHandlerLP):
     def __init__(self, instruments, start_time, end_time, **kwargs):
         data_loader_config = {
-            "feature": [
-                "$close", "$volume", "Ref($close, 1)", "Mean($volume, 20)",
-                "Std($close / Ref($close, 1) - 1, 20)",
+            "feature": [  # 10个常见因子
+                "Log(Mean($volume * $close, 20))",                  # 市值/流动性代理
+                "$close / Ref($close, 20) - 1",                 # 20日动量
+                "$close / Ref($close, 60) - 1",                 # 60日动量
+                "$close / Ref($close, 120) - 1",               # 半年动量
+                "($close / Ref($close, 5) - 1) * -1",                # 5日反转
+                "Std($close / Ref($close, 1) - 1, 20)",         # 20日波动率
+                "Std($close / Ref($close, 1) - 1, 60)",         # 60日波动率
+                "$volume / Mean($volume, 20)",                       # 短期量比
+                "$volume / Mean($volume, 60)",                       # 中期量比
+                "Skew($close / Ref($close, 1) - 1, 20)",       # 20日偏度
             ],
-            "label": ["Ref($close, -1) / $close - 1"],
+            "label": [
+                "Ref($close, -1) / $close - 1"  # 修正：下一交易日收益（未来收益，正向标签）
+            ],
         }
-        data_loader = {"class": "QlibDataLoader", "kwargs": {"config": data_loader_config}}
-        processors = [DropnaProcessor(fields_group="feature"), DropnaLabel(), CSZScoreNorm()]
-
+        data_loader = {
+            "class": "QlibDataLoader",
+            "kwargs": {
+                "config": data_loader_config,
+                "freq": "day",
+            }
+        }
+        # 修正processors：移除无效类，仅保留标准处理器
+        processors = [
+            DropnaLabel(),                  # 丢弃标签NaN行（确保有未来收益）
+            CSZScoreNorm(fields_group="feature"),  # 横截面Z-score标准化
+        ]
         super().__init__(
-            instruments=instruments,
-            start_time=start_time,
-            end_time=end_time,
             data_loader=data_loader,
+            learn_processors=processors,
             **kwargs
         )
-        self.processors = processors
 
-def get_etf_data_example(etf_ticker, start_time, end_time):
-    """Gets and displays a sample of historical data for a given ETF."""
-    print(f"\nFetching raw data sample for {etf_ticker}...")
-    try:
-        features = D.features([etf_ticker], ["$close", "$volume"], start_time=start_time, end_time=end_time)
-        if not features.empty:
-            print(f"Recent data for {etf_ticker}:\n{features.head()}")
-        else:
-            print(f"No raw data found for {etf_ticker}.")
-        return features
-    except Exception as e:
-        print(f"Error fetching raw data for {etf_ticker}: {e}")
-        return pd.DataFrame()
+# 重新创建handler和dataset
+handler = ETFDataHandler(
+    instruments=ETF_LIST,
+    start_time=START_TIME,
+    end_time=END_TIME,
+)
 
-def main():
-    """Main function to demonstrate data preprocessing and access."""
-    pd.set_option('display.max_rows', 100)
+dataset = DatasetH(
+    handler=handler,
+    segments=segments,
+)
 
-    # Time range for analysis
-    START_TIME = "2015-01-01"
-    END_TIME = "2026-01-09"
+# 测试数据（同前）
+train_features = dataset.prepare("train", col_set="feature")
+print("训练集因子数量:", len(train_features.columns))
+print("因子名称:", list(train_features.columns))
+print("\n训练集形状:", train_features.shape)
 
-    # --- 1. Initialize Qlib ---
-    if not setup_qlib():
-        return
+test_features = dataset.prepare("test", col_set="feature")
+print("\n测试集形状:", test_features.shape)
+print("测试集每个ETF样本数:\n", test_features.groupby(level="instrument").size())
 
-    # --- 2. Demonstrate Raw Data Access ---
-    # Fetch data for the first ETF in the list as an example
-    if ETF_LIST:
-        get_etf_data_example(ETF_LIST[0], START_TIME, END_TIME)
+test_label = dataset.prepare("test", col_set="label")
+print("\n测试集标签示例（前10行）:\n", test_label.head(10))
 
-    # --- 3. Preprocess Data with DataHandler ---
-    print("\n--- Starting Data Preprocessing ---")
-    print("Creating DataHandler instance...")
-    handler = ETFDataHandler(
-        instruments=ETF_LIST,
-        start_time=START_TIME,
-        end_time=END_TIME,
-    )
-    print("DataHandler instance created.")
-
-    # Define data segments for training, validation, and testing
-    segments = {
-        "train": ("2015-01-01", "2022-12-31"),
-        "valid": ("2023-01-01", "2024-12-31"),
-        "test": ("2025-01-01", END_TIME),
-    }
-
-    print("Creating DatasetH instance for handling segmented data...")
-    dataset = DatasetH(handler=handler, segments=segments)
-    print("DatasetH instance created.")
-
-    # --- 4. Access and Display Preprocessed Data ---
-    print("\n--- Accessing Preprocessed Data ---")
-    try:
-        # Get and display training data
-        print("\nPreparing training data...")
-        train_features = dataset.prepare("train", col_set="feature")
-        train_label = dataset.prepare("train", col_set="label")
-        
-        print("Training feature data shape:", train_features.shape)
-        if not train_features.empty:
-            print("Training feature sample:\n", train_features.head())
-
-        print("\nTraining label data shape:", train_label.shape)
-        if not train_label.empty:
-            print("Training label sample:\n", train_label.head())
-
-        # Get and display test data
-        print("\nPreparing test data...")
-        test_data = dataset.prepare("test", col_set=["feature", "label"])
-        print("\nTest data shape:", test_data.shape)
-        if not test_data.empty:
-            print("Test data sample:\n", test_data.head())
-            instruments_count = test_data.groupby(level="instrument").size()
-            print("\nNumber of samples per ETF in test set:\n", instruments_count)
-        else:
-            print("Test set is empty. This might be expected if the 'test' date range is in the future.")
-
-    except Exception as e:
-        print(f"\nAn error occurred during data preparation: {e}")
-        print(traceback.format_exc())
-
-if __name__ == '__main__':
-    main()
+print("\n训练集因子相关性:\n", train_features.corr().round(2))
