@@ -149,28 +149,30 @@ def get_trading_signal(topk=5):
         "full_rankings": []
     }
     
-    # [NEW] Fetch Volatility for Display
-    print("\n[Data] Fetching Volatility (VOL20) for display...")
-    vol_df = D.features(D.instruments(market=QLIB_REGION), ['Std($close/Ref($close,1)-1, 20)'], start_time=latest_date, end_time=latest_date)
-    # vol_df index: (instrument, datetime) since single day? Or just (instrument, datetime).
-    # Check shape
+    # [NEW] Fetch Volatility AND Close Price for Display
+    print("\n[Data] Fetching Volatility (VOL20) and Close Price for display...")
+    # Using $close for price.
+    feat_df = D.features(D.instruments(market=QLIB_REGION), ['$close', 'Std($close/Ref($close,1)-1, 20)'], start_time=latest_date, end_time=latest_date)
+    feat_df.columns = ['close', 'vol20']
+    
     vol_map = {}
-    if not vol_df.empty:
+    close_map = {}
+    
+    if not feat_df.empty:
         # Reset index to get symbol
-        # Typically looks like: 
-        #                      Std...
-        # instrument datetime        
-        # SH510300   2023-01-01  0.012
-        
-        # We want simple map: symbol -> vol
         try:
              # Droplevel datetime if present
-            if 'datetime' in vol_df.index.names:
-                vol_reset = vol_df.droplevel('datetime')
+            if 'datetime' in feat_df.index.names:
+                feat_reset = feat_df.droplevel('datetime')
             else:
-                vol_reset = vol_df
+                feat_reset = feat_df
             
-            vol_map = vol_reset.iloc[:, 0].to_dict() # symbol -> vol float
+            vol_map = feat_reset['vol20'].to_dict()
+            close_map = feat_reset['close'].to_dict()
+            
+            print(f"Loaded Features for {len(vol_map)} instruments.")
+        except Exception as e:
+            print(f"Warning: Failed to parse Feature data: {e}")
         except Exception as e:
             print(f"Warning: Failed to parse Volatility data: {e}")
 
@@ -195,6 +197,7 @@ def get_trading_signal(topk=5):
     
     for i, (symbol, score) in enumerate(latest_pred.head(topk + 2).items(), 1): # Show Top K + Buffer
         vol_raw = vol_map.get(symbol, 0.0)
+        close_price = close_map.get(symbol, 0.0)
         
         # Weight Calculation (Only for Top K)
         weight = 0.0
@@ -209,6 +212,7 @@ def get_trading_signal(topk=5):
             "symbol": symbol,
             "score": float(score),
             "volatility": float(vol_raw),
+            "current_price": float(close_price),
             "target_weight": float(weight),
             "is_buffer": i > topk
         }
