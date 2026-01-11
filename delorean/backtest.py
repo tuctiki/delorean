@@ -37,11 +37,12 @@ class SimpleTopkStrategy(BaseSignalStrategy):
                            User terminology: "dropout_rate" ~96% -> 96% chance keep old.
         n_drop (int): Maximum number of stocks to swap per trading step if trading occurs.
     """
-    def __init__(self, topk: int = 4, risk_degree: float = 0.95, drop_rate: float = 0.96, n_drop: int = 1, market_regime: pd.Series = None, vol_feature: pd.Series = None, bench_feature: pd.DataFrame = None, **kwargs: Any):
+    def __init__(self, topk: int = 4, risk_degree: float = 0.95, drop_rate: float = 0.96, n_drop: int = 1, buffer: int = 2, market_regime: pd.Series = None, vol_feature: pd.Series = None, bench_feature: pd.DataFrame = None, **kwargs: Any):
         super().__init__(risk_degree=risk_degree, **kwargs)
         self.topk = topk
         self.drop_rate = drop_rate
         self.n_drop = n_drop
+        self.buffer = buffer
         self.market_regime = market_regime
         self.vol_feature = vol_feature # Index: (datetime, instrument), Value: VOL20
         self.bench_feature = bench_feature # Index: datetime, Columns: close, ma60
@@ -138,18 +139,44 @@ class SimpleTopkStrategy(BaseSignalStrategy):
         current_temp = copy.deepcopy(self.trade_position)
         current_stock_list = current_temp.get_stock_list()
         
-        # 5. Sell Logic with n_drop limit
-        # Identify stocks we hold that are NOT in target
-        hold_not_in_target = [code for code in current_stock_list if code not in target_stocks]
+        # 5. Sell Logic with Buffer Hysteresis
+        # Calculate Ranks (1 is best)
+        # ascending=False means higher score = lower rank number? No.
+        # rank(ascending=False): Higher score gets Rank 1. Correct.
+        ranks = pred_score.rank(ascending=False)
+        
+        # Identify stocks to drop (Rank > TopK + Buffer)
+        to_drop = []
+        kept_stocks = []
+        
+        for code in current_stock_list:
+            # If code not in pred, assume worst rank -> Drop
+            rank = ranks.get(code, 99999)
+            
+            if rank > (self.topk + self.buffer):
+                to_drop.append(code)
+            else:
+                kept_stocks.append(code)
+                
+        # Apply n_drop limit (optional, but requested by user as 'Aggressive Filter' previously)
+        # If we have too many to drop, only drop the worst ones up to n_drop?
+        # Or should Buffer override n_drop? 
+        # User prompt implies Buffer is the main logic.
+        # Let's keep n_drop as a "max turnover per day" safety valve if strictly needed,
+        # but usually with buffer=2, turnover is low. 
+        # If we have 2 to drop and n_drop=1, we only drop 1 (the worst one).
+        
+        # Sort to_drop by Rank (worst first)
+        to_drop.sort(key=lambda x: ranks.get(x, 99999), reverse=True)
+        to_drop = to_drop[:self.n_drop]
+        
+        # Update kept_stocks if we couldn't drop some due to n_drop
+        # Actually kept_stocks logic above was "what we WANT to keep".
+        # If we are forced to keep something because n_drop limit, it remains in holdings.
+        # So we don't need to explicitly add back to kept_stocks, just implicit in calculate.
 
-        # Get scores for held stocks
-        score_map = pred_score.to_dict()
-        
-        # Sort held_not_in_target by score (ascending: drop worst)
-        hold_not_in_target.sort(key=lambda x: score_map.get(x, -9999))
-        
-        # Select ones to actually drop (limit by n_drop)
-        to_drop = hold_not_in_target[:self.n_drop]
+
+
         
         sell_order_list = []
         for code in to_drop:
@@ -175,18 +202,28 @@ class SimpleTopkStrategy(BaseSignalStrategy):
         buy_order_list = []
         sell_order_rebalance_list = []
         
+        # Calculate what we will hold after sells
+        # current_holdings_after_sell = [code for code in current_stock_list if code not in to_drop]
+        # Using current_temp is accurate as we dealt orders.
         current_holdings_after_sell = current_temp.get_stock_list()
         
-        # Merge current holdings + new buys to form "Target Portfolio" for today
+        # 6. Buy Logic
+        # Fill available slots up to self.topk
         slots_available = self.topk - len(current_holdings_after_sell)
         
         final_target_stocks = list(current_holdings_after_sell)
         
         if slots_available > 0:
-            # Pick best candidates from target_stocks not currently held
-            candidates = [s for s in target_stocks if s not in current_holdings_after_sell]
-            # Since target_stocks is already topk sorted, just take top `slots_available`
-            to_buy = candidates[:slots_available]
+            # Pick best candidates from sorted_score that are NOT in current holdings
+            # sorted_score is Series with index=code, value=score. Already sorted desc.
+            candidates = sorted_score.index.tolist()
+            to_buy = []
+            for code in candidates:
+                if len(to_buy) >= slots_available:
+                    break
+                if code not in current_holdings_after_sell:
+                    to_buy.append(code)
+            
             final_target_stocks.extend(to_buy)
         else:
             to_buy = []

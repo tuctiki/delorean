@@ -23,7 +23,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--use_hybrid", action="store_true", help="Use Hybrid Factors (Custom + Alpha158)")
     parser.add_argument("--risk_parity", action="store_true", help="Enable Volatility Targeting (1/Vol)")
     parser.add_argument("--dynamic_exposure", action="store_true", help="Enable Trend-based Dynamic Exposure")
+    parser.add_argument("--buffer", type=int, default=2, help="Rank Buffer for Hysteresis (default: 2)")
     parser.add_argument("--seed", type=int, default=42, help="Random seed for reproducibility")
+    parser.add_argument("--smooth_window", type=int, default=10, help="EWMA smoothing halflife (days). Higher = Lower Turnover.")
     return parser.parse_args()
 
 def fix_seed(seed: int) -> None:
@@ -117,15 +119,16 @@ def main() -> None:
         else:
             level_name = pred.index.names[1]
             
-        # EWMA Smoothing (Halflife=10 days)
+        # EWMA Smoothing (Halflife=args.smooth_window days)
         # Note: groupby(level=...).apply(...) often prepends the group key to the index.
         # Original index: (datetime, instrument)
         # Result index: (instrument, datetime, instrument) -> we need to drop top level.
         # 2. Time-Series Smoothing (EWMA on Raw Scores)
-        # Reverting to Raw Score + 10d EWMA (Apex Config).
+        # Reverting to Raw Score + EWMA (Apex Config).
         # Rank smoothing removed to preserve magnitude signal.
+        print(f"Applying {args.smooth_window}-day EWMA Signal Smoothing...")
         pred = pred.groupby(level=level_name).apply(
-            lambda x: x.ewm(halflife=10, min_periods=1).mean()
+            lambda x: x.ewm(halflife=args.smooth_window, min_periods=1).mean()
         )
         
         # Remove redundant level 0 if added
@@ -167,6 +170,7 @@ def main() -> None:
             "topk": args.topk,
             "drop_rate": 0.96,
             "n_drop": 1,
+            "buffer": args.buffer,
             "market_regime": "MA60", # Descriptive for logging
             "risk_parity": args.risk_parity,
             "dynamic_exposure": args.dynamic_exposure
@@ -199,6 +203,7 @@ def main() -> None:
             topk=strategy_params["topk"], 
             drop_rate=strategy_params["drop_rate"], 
             n_drop=strategy_params["n_drop"], 
+            buffer=strategy_params["buffer"],
             market_regime=market_regime,
             vol_feature=vol_feature,
             bench_feature=exposure_bench_feature

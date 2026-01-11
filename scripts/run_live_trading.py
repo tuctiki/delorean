@@ -10,7 +10,7 @@ from delorean.config import QLIB_PROVIDER_URI, QLIB_REGION, BENCHMARK
 from delorean.data import ETFDataLoader
 from delorean.model import ModelTrainer
 
-def get_trading_signal(topk=4):
+def get_trading_signal(topk=5):
     """
     Generates trading signals for the latest available date.
     
@@ -55,14 +55,14 @@ def get_trading_signal(topk=4):
     pred = model_trainer.predict(dataset)
     
     # 5. Signal Processing (EWMA)
-    print("[4/5] Applying 10-day EWMA Smoothing (Apex Config)...")
+    print("[4/5] Applying 20-day EWMA Smoothing (Apex Config)...")
     if pred.index.names[1] == 'instrument':
         level_name = 'instrument'
     else:
         level_name = pred.index.names[1]
         
     pred = pred.groupby(level=level_name).apply(
-        lambda x: x.ewm(halflife=10, min_periods=1).mean()
+        lambda x: x.ewm(halflife=20, min_periods=1).mean()
     )
     
     # Clean index (same fix as run_etf_analysis.py)
@@ -201,8 +201,8 @@ def get_trading_signal(topk=4):
     
     print("\n[Strategy Note]")
     print(f"- Target Hold: Top {topk}")
-    print(f"- Turnover Control: Only swap if you hold a low-ranked ETF.")
-    print("- Aggressive Filter: 'n_drop=1'.")
+    print(f"- Buffer Logic (Hysteresis): Keep existing holdings if Rank <= {topk+2}.")
+    print(f"- Turnover Control: Only swap if Rank > {topk+2}.")
     print("- Regime Filter: If Bear Market Warning above, prefer CASH.")
 
 if __name__ == "__main__":
