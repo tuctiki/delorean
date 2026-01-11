@@ -167,3 +167,40 @@
   border-radius: 4px;
   margin-left: 1rem;
 }
+
+.allocation {
+  font-family: monospace;
+  font-weight: 600;
+  color: #2ecc71;
+  /* Greenish for allocation */
+  background: rgba(46, 204, 113, 0.1);
+  padding: 0.2rem 0.6rem;
+  border-radius: 4px;
+  margin-right: 1rem;
+  min-width: 60px;
+  text-align: right;
+}
+
+.bufferItem {
+  background: rgba(241, 196, 15, 0.05);
+  /* Very faint yellow bg */
+  border-left: 3px solid #f1c40f;
+}
+
+.rankBuffer {
+  color: #f1c40f;
+  /* Yellow rank for buffer */
+}
+
+.listHeader {
+  display: flex;
+  align-items: center;
+  padding: 0 0.8rem;
+  margin-bottom: -0.4rem;
+  font-size: 0.85rem;
+  color: #a0a0a0;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.8;
+}

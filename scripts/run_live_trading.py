@@ -124,7 +124,16 @@ def get_trading_signal(topk=5):
         last_ma60 = 0.0
 
     
-    # [NEW] Save Daily Recommendations Artifact for Frontend
+    # [NEW] Configuration Artifact
+    # We should match this with how we ran the script, or just hardcode the "Active" settings
+    # Since this script "is" the active strategy, we define what it does.
+    strategy_config = {
+        "topk": topk,
+        "smooth_window": 20,
+        "buffer": 2,
+        "mode": "Risk Parity + Dynamic Exposure"
+    }
+
     rec_artifact = {
         "date": latest_date.strftime('%Y-%m-%d'),
         "market_status": "Bear" if (bench_df.empty or not is_bull) else "Bull",
@@ -132,7 +141,9 @@ def get_trading_signal(topk=5):
             "benchmark_close": last_close,
             "benchmark_ma60": last_ma60
         },
+        "strategy_config": strategy_config,
         "top_recommendations": [],
+        "buffer_holdings": [], # For ranks within buffer
         "full_rankings": []
     }
     
@@ -161,17 +172,46 @@ def get_trading_signal(topk=5):
         except Exception as e:
             print(f"Warning: Failed to parse Volatility data: {e}")
 
-    # Top K
-    for symbol, score in latest_pred.head(topk).items():
+    # Calculate Target Weights (Risk Parity on Top K)
+    # 1. Get Vols for Top K
+    topk_candidates = latest_pred.head(topk).index
+    inv_vols = {}
+    sum_inv_vol = 0.0
+    
+    for symbol in topk_candidates:
+         vol_raw = vol_map.get(symbol, 0.0)
+         if pd.isna(vol_raw) or vol_raw <= 0: vol_raw = 0.01 # Avoid div by zero, assume low risk/avg
+         inv_vol = 1.0 / vol_raw
+         inv_vols[symbol] = inv_vol
+         sum_inv_vol += inv_vol
+         
+    # 2. Populate Recommendations with Weights
+    # We Iterate larger than topk to capture Buffer items too if needed for display
+    # But weights are usually allocated to Top K. Buffer items held have "current weight" but 0 target weight?
+    # Actually strategy says: Buffer held? Keep it. 
+    # For UI simplicity: Show Target Weights for Top K (The "Buy" List).
+    
+    for i, (symbol, score) in enumerate(latest_pred.head(topk + 2).items(), 1): # Show Top K + Buffer
         vol_raw = vol_map.get(symbol, 0.0)
-        # Check if nan
-        if pd.isna(vol_raw): vol_raw = 0.0
         
-        rec_artifact["top_recommendations"].append({
+        # Weight Calculation (Only for Top K)
+        weight = 0.0
+        if i <= topk:
+            if sum_inv_vol > 0:
+                 weight = inv_vols.get(symbol, 0.0) / sum_inv_vol
+            else:
+                 weight = 1.0 / topk
+        
+        item = {
+            "rank": i,
             "symbol": symbol,
             "score": float(score),
-            "volatility": float(vol_raw)
-        })
+            "volatility": float(vol_raw),
+            "target_weight": float(weight),
+            "is_buffer": i > topk
+        }
+        
+        rec_artifact["top_recommendations"].append(item)
         
     # Full list (limit to top 50 to avoid huge json if needed, or all)
     for symbol, score in latest_pred.items():
