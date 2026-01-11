@@ -6,7 +6,7 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from qlib.workflow import R
-from delorean.config import QLIB_PROVIDER_URI, QLIB_REGION, BENCHMARK
+from delorean.config import QLIB_PROVIDER_URI, QLIB_REGION, BENCHMARK, ETF_NAME_MAP
 from delorean.data import ETFDataLoader
 from delorean.model import ModelTrainer
 
@@ -197,6 +197,7 @@ def get_trading_signal(topk=5):
         item = {
             "rank": i,
             "symbol": symbol,
+            "name": ETF_NAME_MAP.get(symbol, symbol),
             "score": float(score),
             "volatility": float(vol_raw),
             "current_price": float(close_price),

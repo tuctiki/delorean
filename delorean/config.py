@@ -18,6 +18,23 @@ ETF_LIST = [
     "510880.SH",    # 红利ETF (Defensive)
 ]
 
+ETF_NAME_MAP = {
+    "510300.SH": "CSI 300",
+    "563360.SH": "A500",
+    "159915.SZ": "ChiNext (Startup)",
+    "588000.SH": "STAR 50 (Tech)",
+    "512100.SH": "CSI 1000 (Small Cap)",
+    "512480.SH": "Semiconductor",
+    "516160.SH": "New Energy",
+    "512690.SH": "Spirit/Liquor",
+    "512800.SH": "Bank",
+    "512010.SH": "Pharma",
+    "510630.SH": "Consumer",
+    "515790.SH": "PV/Solar",
+    "512880.SH": "Securities",
+    "510880.SH": "Dividend (RedChip)",
+}
+
 # Benchmark
 BENCHMARK = "510300.SH"
 

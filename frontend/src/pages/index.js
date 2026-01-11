@@ -43,7 +43,8 @@ export default function Home() {
 
   return (
 
-    <Layout>
+
+    <>
       <div className={styles.grid}>
         <div style={{ gridColumn: '1 / -1', marginBottom: '10px' }}>
           <h1 className={styles.title}>Dashboard</h1>
@@ -148,6 +149,7 @@ export default function Home() {
               <div className={styles.listHeader}>
                 <div className={styles.rank} title="Rank based on Model Score">#</div>
                 <div className={styles.symbol} title="ETF Ticker Symbol">ETF</div>
+                <div style={{ flex: 1.5, fontWeight: 500, color: '#c9d1d9', fontSize: '0.9rem' }} title="ETF Name">Name</div>
                 <div className={styles.allocation} title="Recommended Weight (Risk Parity)">Alloc</div>
                 <div className={styles.score} title="Raw Model Prediction Score">Score</div>
                 <div style={{ marginLeft: '1rem', width: '60px', fontSize: '0.85rem', color: '#a0a0a0' }} title="20-Day Annualized Volatility">Vol</div>
@@ -160,8 +162,12 @@ export default function Home() {
             {!recError && recs?.top_recommendations?.length > 0 ? (
               recs.top_recommendations.map((item, i) => {
                 const price = item.current_price || 0;
-                const rawShares = (price > 0 && item.target_weight)
-                  ? (capital * item.target_weight) / price
+                const topk = recs.strategy_config?.topk || 5;
+                // For buffer items (Rank 6/7), assume equal weight (1/K) for share estimation
+                const weight = item.target_weight > 0 ? item.target_weight : (item.is_buffer ? (1.0 / topk) : 0);
+
+                const rawShares = (price > 0 && weight > 0)
+                  ? (capital * weight) / price
                   : 0;
                 const shares = Math.floor(rawShares / 100) * 100;
 
@@ -171,6 +177,7 @@ export default function Home() {
                       #{item.rank || i + 1}
                     </div>
                     <div className={styles.symbol}>{item.symbol}</div>
+                    <div style={{ flex: 1.5, color: '#8b949e', fontSize: '0.85rem' }}>{item.name || '-'}</div>
 
                     <div className={styles.allocation}>
                       {item.target_weight ? `${(item.target_weight * 100).toFixed(1)}%` : '-'}
@@ -211,6 +218,6 @@ export default function Home() {
           )}
         </div>
       </div>
-    </Layout>
+    </>
   );
 }

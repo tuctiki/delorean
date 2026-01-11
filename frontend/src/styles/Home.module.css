@@ -232,4 +232,4 @@
   text-transform: uppercase;
   letter-spacing: 0.05em;
   opacity: 0.8;
-}
+}.listHeader { white-space: nowrap; }
