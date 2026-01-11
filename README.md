@@ -62,10 +62,13 @@ To run research experiments:
 
 ```bash
 export PYTHONPATH=$PYTHONPATH:.
-python scripts/run_etf_analysis.py --topk 4
+python scripts/run_etf_analysis.py --topk 4 --risk_parity --dynamic_exposure --seed 42
 ```
 
 **Options:**
+-   `--risk_parity`: Enable Volatility Targeting (1/Vol weighting).
+-   `--dynamic_exposure`: Enable Trend-based Dynamic Exposure (Manage Beta).
+-   `--seed <int>`: Fix random seed for reproducibility (default: 42).
 -   `--use_alpha158`: Use Qlib's Alpha158 factors.
 -   `--use_hybrid`: Use Hybrid factors.
 
@@ -76,12 +79,21 @@ python scripts/run_etf_analysis.py --topk 4
 -   **Alpha158**: Standard Qlib 158 factors.
 -   **Hybrid**: Combination with correlation filtering.
 
+### Position Control (New)
+The strategy now supports advanced position sizing:
+-   **Volatility Targeting (Risk Parity)**: Allocates capital inversely proportional to risk (`1/VOL20`). Includes **Buffer Rebalancing** to minimize noise trading.
+-   **Dynamic Market Exposure**: Adjusts equity exposure (0% - 99%) based on the Benchmark Trend Strength (Close vs MA60) with **Hysteresis** to prevent whipsaws.
+
 ### Experiment Tracking
 All runs are logged to `mlruns/`, viewable via the Dashboard or standard MLflow tools.
 
-### Performance (Verification)
-| Metric | Original Custom Strategy |
-| :--- | :--- |
-| **Annualized Return** | **8.56%** |
-| **Max Drawdown** | **-12.28%** |
-| **Sharpe Ratio** | **0.77** |
+### Performance (Verification: 2023-Present)
+| Metric | Original Custom Strategy | **Optimized (Risk Parity + Dynamic)** |
+| :--- | :--- | :--- |
+| **Annualized Return** | 8.56% | **12.70%** |
+| **Max Drawdown** | -12.28% | **-14.02%** |
+| **Sharpe Ratio** | 0.77 | **0.84** |
+
+## Frontend Features
+-   **Bear Market Alert**: Visual warning when Benchmark Close < MA60.
+-   **Volatility Scores**: Real-time volatility monitoring for each ETF.

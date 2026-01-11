@@ -37,12 +37,15 @@ class SimpleTopkStrategy(BaseSignalStrategy):
                            User terminology: "dropout_rate" ~96% -> 96% chance keep old.
         n_drop (int): Maximum number of stocks to swap per trading step if trading occurs.
     """
-    def __init__(self, topk: int = 4, risk_degree: float = 0.95, drop_rate: float = 0.96, n_drop: int = 1, market_regime: pd.Series = None, **kwargs: Any):
+    def __init__(self, topk: int = 4, risk_degree: float = 0.95, drop_rate: float = 0.96, n_drop: int = 1, market_regime: pd.Series = None, vol_feature: pd.Series = None, bench_feature: pd.DataFrame = None, **kwargs: Any):
         super().__init__(risk_degree=risk_degree, **kwargs)
         self.topk = topk
         self.drop_rate = drop_rate
         self.n_drop = n_drop
         self.market_regime = market_regime
+        self.vol_feature = vol_feature # Index: (datetime, instrument), Value: VOL20
+        self.bench_feature = bench_feature # Index: datetime, Columns: close, ma60
+        self.last_risk_degree = risk_degree # State for Hysteresis
 
     def generate_trade_decision(self, execute_result: Any = None) -> TradeDecisionWO:
         """
@@ -52,26 +55,73 @@ class SimpleTopkStrategy(BaseSignalStrategy):
         trade_step = self.trade_calendar.get_trade_step()
         trade_start_time, trade_end_time = self.trade_calendar.get_step_time(trade_step)
 
-        # 0. Market Regime Filter (Bear Market Defense)
-        # If market_regime provided and False (Bear), Liquidate All.
+        # 0. Market Regime & Dynamic Exposure (with Hysteresis)
+        current_risk_degree = self.last_risk_degree # Default to last state
+        
+        # If market_regime provided (Boolean Series) - Legacy/Override
         if self.market_regime is not None:
-            # Check if current date (trade_start_time) is in Bear market
-            # Regime series index should be datetime
-            # We use 'asof' or direct lookup
-            try:
-                # Assuming index is pd.Timestamp
+             try:
                 is_bull = self.market_regime.loc[trade_start_time] if trade_start_time in self.market_regime.index else True
-            except:
-                is_bull = True # Default to Bull if data missing
-            
-            if not is_bull:
-                # BEAR MARKET: Sell Everything, Buy Nothing.
-                return TradeDecisionWO(self._generate_sell_orders(self.trade_position, pd.Index([]), trade_start_time, trade_end_time), self)
+             except:
+                is_bull = True
+             
+             if not is_bull:
+                 # Standard Regime Filter: Sell All
+                 return TradeDecisionWO(self._generate_sell_orders(self.trade_position, pd.Index([]), trade_start_time, trade_end_time), self)
 
+        # [NEW] Dynamic Exposure (Trend Strength) with Hysteresis
+        if self.bench_feature is not None:
+             try:
+                 # Check if we have data for this date
+                 if trade_start_time in self.bench_feature.index:
+                     row = self.bench_feature.loc[trade_start_time]
+                     close = row['close']
+                     ma60 = row['ma60']
+                     
+                     trend_strength = (close - ma60) / ma60
+                     
+                     # Hysteresis Logic
+                     # States: High (0.99), Med (0.80), Off (0.0)
+                     # Transitions with buffers
+                     
+                     if current_risk_degree >= 0.99:
+                         # In High -> Downgrade to Med if < 1%
+                         if trend_strength < 0.01:
+                             current_risk_degree = 0.80
+                     elif current_risk_degree >= 0.80:
+                         # In Med -> Upgrade to High if > 2%
+                         if trend_strength > 0.02:
+                             current_risk_degree = 0.99
+                         # In Med -> Downgrade to Off if < -1% (Buffer below 0)
+                         elif trend_strength < -0.01:
+                             current_risk_degree = 0.0
+                     else:
+                         # In Off -> Upgrade to Med if > 0%
+                         if trend_strength > 0:
+                             current_risk_degree = 0.80
+
+                     # Bear (Below MA60) -> 0% (Cash) - Implicitly handled by transition to Off
+                     if current_risk_degree == 0.0:
+                          self.last_risk_degree = 0.0
+                          return TradeDecisionWO(self._generate_sell_orders(self.trade_position, pd.Index([]), trade_start_time, trade_end_time), self)
+
+             except Exception as e:
+                 pass # Fallback to default
+        
+        # Update State
+        self.last_risk_degree = current_risk_degree
+        
         # 0.5 Turnover control: Probabilistic Retention
         # If random < drop_rate, we SKIP trading this step (hold existing)
         # Only applies in Bull Market (if we are here)
-        if random.random() < self.drop_rate:
+        
+        # [FIX] Do NOT skip if we need to ENTER the market (current holdings empty but bullish)
+        current_holdings_list = self.trade_position.get_stock_list()
+        should_force_trade = (len(current_holdings_list) == 0) and (current_risk_degree > 0)
+        
+        if (not should_force_trade) and (random.random() < self.drop_rate):
+            # IMPORTANT: If using Dynamic Exposure, we might need to REBALANCE cash even if we skip turnover rotation.
+            # But simplistic approach: if skip, do nothing.
             return TradeDecisionWO([], self)
         
         # 2. Get Scores
@@ -91,13 +141,8 @@ class SimpleTopkStrategy(BaseSignalStrategy):
         # 5. Sell Logic with n_drop limit
         # Identify stocks we hold that are NOT in target
         hold_not_in_target = [code for code in current_stock_list if code not in target_stocks]
-        
-        # If we have valid holdings, we only want to drop 'n_drop' of them
-        # Sort them by score (lowest score first) to drop the worst ones
-        # If score is missing, assuming worst
-        
+
         # Get scores for held stocks
-        # Create a dict for lookups
         score_map = pred_score.to_dict()
         
         # Sort held_not_in_target by score (ascending: drop worst)
@@ -105,17 +150,6 @@ class SimpleTopkStrategy(BaseSignalStrategy):
         
         # Select ones to actually drop (limit by n_drop)
         to_drop = hold_not_in_target[:self.n_drop]
-        
-        # Also, we might have slots if we currently hold < topk
-        # But wait, if we drop `to_drop`, we free up slots.
-        # What if we just sold everything not in target? That was previous logic (high turnover).
-        # New logic: Only sell `to_drop` list.
-        # AND: we keep `hold_not_in_target[self.n_drop:]` (these remain part of our "semi-target" for today)
-        
-        # Effective Target = (Target Intersect Current) + (Remaining Current) + (New Buys to fill TopK)
-        # Actually simpler: 
-        # 1. Sell `to_drop`.
-        # 2. Buy stocks from `target_stocks` that are NOT held, until we reach `topk`.
         
         sell_order_list = []
         for code in to_drop:
@@ -137,62 +171,116 @@ class SimpleTopkStrategy(BaseSignalStrategy):
 
         # 6. Buy Logic
         # We want to fill up to `topk`.
-        # Current Count = (Original Count) - (Dropped Count)
-        # We need to buy (TopK - Current Count) new stocks?
-        # Ideally we pick the best ones from `target_stocks` that we don't hold.
         
         buy_order_list = []
+        sell_order_rebalance_list = []
         
         current_holdings_after_sell = current_temp.get_stock_list()
+        
+        # Merge current holdings + new buys to form "Target Portfolio" for today
         slots_available = self.topk - len(current_holdings_after_sell)
+        
+        final_target_stocks = list(current_holdings_after_sell)
         
         if slots_available > 0:
             # Pick best candidates from target_stocks not currently held
             candidates = [s for s in target_stocks if s not in current_holdings_after_sell]
             # Since target_stocks is already topk sorted, just take top `slots_available`
             to_buy = candidates[:slots_available]
+            final_target_stocks.extend(to_buy)
+        else:
+            to_buy = []
+
+        # [NEW] Volatility Targeting (Risk Parity)
+        # Calculate weights for final_target_stocks
+        # Formula: w_i = (1/vol_i) / sum(1/vol_j)
+        
+        target_weights = {} # code -> weight
+        
+        if self.vol_feature is not None:
+             # Get volatility for these stocks on this date
+             inv_vols = {}
+             sum_inv_vol = 0.0
+             
+             for code in final_target_stocks:
+                 try:
+                     vol = self.vol_feature.loc[(trade_start_time, code)]
+                     if pd.isna(vol) or vol <= 0: vol = 1.0 # Fallback
+                 except:
+                     vol = 1.0 # Fallback
+                     
+                 inv_vol = 1.0 / vol
+                 inv_vols[code] = inv_vol
+                 sum_inv_vol += inv_vol
+                 
+             if sum_inv_vol > 0:
+                 for code in final_target_stocks:
+                     target_weights[code] = inv_vols[code] / sum_inv_vol
+             else:
+                 # Fallback to EW
+                 for code in final_target_stocks:
+                     target_weights[code] = 1.0 / len(final_target_stocks)
+        else:
+             # Equal Weight
+             for code in final_target_stocks:
+                 target_weights[code] = 1.0 / len(final_target_stocks)
+
+        # Execute Buys / Rebalance
+        # Calculate target value
+        current_total_value = current_temp.calculate_value()
+        
+        # [OPTIMIZATION] Buffer Rebalancing
+        # Threshold: 2% of total portfolio value
+        buffer_threshold = current_total_value * 0.02
+        
+        for code in final_target_stocks:
+            # Buy/Sell to reach target weight
+            target_val = current_total_value * current_risk_degree * target_weights[code]
             
-            # Calculate target value per stock
-            # We assume equal weight among ALL held stocks (roughly)
-            # Or just allocate available cash to new buys?
-            # User wants "small adjustments". Allocating available cash is safer/lower turnover than rebalancing everything.
+            current_amount = current_temp.get_stock_amount(code=code)
             
-            cash = current_temp.get_cash()
-            # If we just allocate cash / count, it might drift.
-            # But let's try standard equal weight target for NEW/REBALANCING stocks?
-            # Let's stick to: Target Value = Total Asset * Risk / TopK
+             # Check Price
+            if not self.trade_exchange.is_stock_tradable(stock_id=code, start_time=trade_start_time, end_time=trade_end_time, direction=OrderDir.BUY):
+                 continue
+            current_price = self.trade_exchange.get_deal_price(stock_id=code, start_time=trade_start_time, end_time=trade_end_time, direction=OrderDir.BUY)
             
-            current_value = current_temp.calculate_value()
-            target_value_per_stock = current_value * self.risk_degree / self.topk
+            target_amount = target_val / current_price
+            diff_amount = target_amount - current_amount
+            diff_val = diff_amount * current_price
             
-            # Rebalance Phase: Check buys (fill gaps)
-            # We focus on `to_buy` list mostly, but we could also check held stocks for drift?
-            # To minimize turnover, let's ONLY buy the new ones for now, and rely on `n_drop` cycle to rotate.
-            # Rebalancing existing positions adds turnover. Let's skip it unless necessary?
-            # Let's add them to `to_buy`.
+            # Skip if deviation is within buffer (unless it is a new buy which effectively has diff_val = target_val)
+            # Actually diff_val is the absolute dollar amount we want to trade.
+            if abs(diff_val) < buffer_threshold:
+                continue
             
-            for code in to_buy:
-                if not self.trade_exchange.is_stock_tradable(stock_id=code, start_time=trade_start_time, end_time=trade_end_time, direction=OrderDir.BUY):
-                    continue
-                
-                current_price = self.trade_exchange.get_deal_price(stock_id=code, start_time=trade_start_time, end_time=trade_end_time, direction=OrderDir.BUY)
-                target_amount = target_value_per_stock / current_price
-                
-                # We hold 0, so buy target_amount
-                factor = self.trade_exchange.get_factor(stock_id=code, start_time=trade_start_time, end_time=trade_end_time)
-                buy_amount = self.trade_exchange.round_amount_by_trade_unit(target_amount, factor)
-                
+            factor = self.trade_exchange.get_factor(stock_id=code, start_time=trade_start_time, end_time=trade_end_time)
+            
+            if diff_amount > 0:
+                # Buy
+                buy_amount = self.trade_exchange.round_amount_by_trade_unit(diff_amount, factor)
                 if buy_amount > 0:
-                    buy_order = Order(
+                     buy_order = Order(
                         stock_id=code,
                         amount=buy_amount,
                         start_time=trade_start_time,
                         end_time=trade_end_time,
                         direction=OrderDir.BUY
                     )
-                    buy_order_list.append(buy_order)
+                     buy_order_list.append(buy_order)
+            elif diff_amount < 0:
+                # Sell (Rebalance Down)
+                sell_amount = self.trade_exchange.round_amount_by_trade_unit(abs(diff_amount), factor)
+                if sell_amount > 0:
+                     sell_order = Order(
+                        stock_id=code,
+                        amount=sell_amount,
+                        start_time=trade_start_time,
+                        end_time=trade_end_time,
+                        direction=OrderDir.SELL
+                    )
+                     sell_order_rebalance_list.append(sell_order)
 
-        return TradeDecisionWO(sell_order_list + buy_order_list, self)
+        return TradeDecisionWO(sell_order_list + sell_order_rebalance_list + buy_order_list, self)
 
     def _get_pred_scores(self, trade_step: int) -> Optional[pd.Series]:
         """Fetch prediction scores for the next trading day (shift=1)."""

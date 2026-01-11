@@ -10,13 +10,14 @@ class ModelTrainer:
     """
     Encapsulates the training and prediction logic for the LightGBM model.
     """
-    def __init__(self):
+    def __init__(self, seed: int = 42):
         """
         Initialize the ModelTrainer.
         """
         self.model: Any = None # Can be LGBModel or lgb.Booster
         self.selected_features: Optional[List[str]] = None
         self.params: Dict[str, Any] = {}
+        self.seed = seed
 
     def train(self, dataset: DatasetH, selected_features: Optional[List[str]] = None) -> None:
         """
@@ -46,7 +47,8 @@ class ModelTrainer:
                 "reg_alpha": 1.0,      # Stronger L1
                 "reg_lambda": 1.0,     # Stronger L2
                 "n_jobs": -1,
-                "verbosity": -1
+                "verbosity": -1,
+                "seed": self.seed
             }
             self.params = params
             
@@ -78,6 +80,7 @@ class ModelTrainer:
                 "min_data_in_leaf": 30,
                 "early_stopping_rounds": 100,
                 "num_boost_round": 1000,
+                "seed": self.seed
             }
             self.model = LGBModel(**self.params)
             print("Starts training...")

@@ -99,6 +99,11 @@ export default function Home() {
                   <div className={styles.rank}>#{i + 1}</div>
                   <div className={styles.symbol}>{item.symbol}</div>
                   <div className={styles.score}>{item?.score?.toFixed(4)}</div>
+                  {item.volatility !== undefined && (
+                    <div className={styles.volatility} title="20-Day Volatility">
+                      v{(item.volatility * 100).toFixed(2)}%
+                    </div>
+                  )}
                 </div>
               ))
             ) : (

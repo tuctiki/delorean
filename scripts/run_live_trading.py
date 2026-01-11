@@ -136,18 +136,51 @@ def get_trading_signal(topk=4):
         "full_rankings": []
     }
     
+    # [NEW] Fetch Volatility for Display
+    print("\n[Data] Fetching Volatility (VOL20) for display...")
+    vol_df = D.features(D.instruments(market=QLIB_REGION), ['Std($close/Ref($close,1)-1, 20)'], start_time=latest_date, end_time=latest_date)
+    # vol_df index: (instrument, datetime) since single day? Or just (instrument, datetime).
+    # Check shape
+    vol_map = {}
+    if not vol_df.empty:
+        # Reset index to get symbol
+        # Typically looks like: 
+        #                      Std...
+        # instrument datetime        
+        # SH510300   2023-01-01  0.012
+        
+        # We want simple map: symbol -> vol
+        try:
+             # Droplevel datetime if present
+            if 'datetime' in vol_df.index.names:
+                vol_reset = vol_df.droplevel('datetime')
+            else:
+                vol_reset = vol_df
+            
+            vol_map = vol_reset.iloc[:, 0].to_dict() # symbol -> vol float
+        except Exception as e:
+            print(f"Warning: Failed to parse Volatility data: {e}")
+
     # Top K
     for symbol, score in latest_pred.head(topk).items():
+        vol_raw = vol_map.get(symbol, 0.0)
+        # Check if nan
+        if pd.isna(vol_raw): vol_raw = 0.0
+        
         rec_artifact["top_recommendations"].append({
             "symbol": symbol,
-            "score": float(score)
+            "score": float(score),
+            "volatility": float(vol_raw)
         })
         
     # Full list (limit to top 50 to avoid huge json if needed, or all)
     for symbol, score in latest_pred.items():
+         vol_raw = vol_map.get(symbol, 0.0)
+         if pd.isna(vol_raw): vol_raw = 0.0
          rec_artifact["full_rankings"].append({
             "symbol": symbol,
-            "score": float(score)
+            "score": float(score),
+            "volatility": float(vol_raw)
         })
         
     import json

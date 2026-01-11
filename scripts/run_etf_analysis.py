@@ -21,13 +21,37 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--topk", type=int, default=4, help="Number of stocks to hold in TopK strategy (default: 4)")
     parser.add_argument("--use_alpha158", action="store_true", help="Use Qlib Alpha158 embedded factors")
     parser.add_argument("--use_hybrid", action="store_true", help="Use Hybrid Factors (Custom + Alpha158)")
+    parser.add_argument("--risk_parity", action="store_true", help="Enable Volatility Targeting (1/Vol)")
+    parser.add_argument("--dynamic_exposure", action="store_true", help="Enable Trend-based Dynamic Exposure")
+    parser.add_argument("--seed", type=int, default=42, help="Random seed for reproducibility")
     return parser.parse_args()
+
+def fix_seed(seed: int) -> None:
+    """
+    Fix random seeds for reproducibility.
+    """
+    import random
+    import numpy as np
+    
+    random.seed(seed)
+    np.random.seed(seed)
+    
+    try:
+        import torch
+        torch.manual_seed(seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed_all(seed)
+    except ImportError:
+        pass
+    print(f"Random Seed Fixed: {seed}")
 
 def main() -> None:
     """
     Main execution function.
     """
     args = parse_args()
+    fix_seed(args.seed)
+
 
     # 1. Initialize Qlib
     qlib.init(provider_uri=QLIB_PROVIDER_URI, region=QLIB_REGION)
@@ -41,7 +65,7 @@ def main() -> None:
     factor_analyzer.analyze(dataset)
 
     # 4. Model Training
-    model_trainer = ModelTrainer()
+    model_trainer = ModelTrainer(seed=args.seed)
     
     # Using Recorder for experiment tracking
     # Using Recorder for experiment tracking
@@ -143,15 +167,41 @@ def main() -> None:
             "topk": args.topk,
             "drop_rate": 0.96,
             "n_drop": 1,
-            "market_regime": "MA60" # Descriptive for logging
+            "market_regime": "MA60", # Descriptive for logging
+            "risk_parity": args.risk_parity,
+            "dynamic_exposure": args.dynamic_exposure
         }
         
+        # Prepare Position Control Data
+        vol_feature = None
+        if args.risk_parity:
+            # We need VOL20. 
+            print("Fetching Volatility Data for Risk Parity...")
+            # Fetch explicitly via Qlib
+            try:
+                # Std($close/Ref($close,1)-1, 20)
+                # Note: Qlib expressions need to be exact.
+                vol_data = D.features(D.instruments(market=QLIB_REGION), ['Std($close/Ref($close,1)-1, 20)'], start_time=START_TIME, end_time=END_TIME)
+                vol_data.columns = ['VOL20']
+                vol_feature = vol_data['VOL20']
+            except Exception as e:
+                print(f"Warning: Failed to fetch VOL20 data: {e}")
+                vol_feature = None
+
+        # Prepare Benchmark Feature for Dynamic Exposure (Close, MA60)
+        exposure_bench_feature = None
+        if args.dynamic_exposure:
+             # bench_close already has 'close' and 'ma60' columns
+             exposure_bench_feature = bench_close
+
         # Pass updated robust params AND Market Regime (User Requested)
         report, positions = backtest_engine.run(
             topk=strategy_params["topk"], 
             drop_rate=strategy_params["drop_rate"], 
             n_drop=strategy_params["n_drop"], 
-            market_regime=market_regime
+            market_regime=market_regime,
+            vol_feature=vol_feature,
+            bench_feature=exposure_bench_feature
         )
         
         # 5. Experiment Logging
