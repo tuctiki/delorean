@@ -24,6 +24,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--risk_parity", action="store_true", help="Enable Volatility Targeting (1/Vol)")
     parser.add_argument("--dynamic_exposure", action="store_true", help="Enable Trend-based Dynamic Exposure")
     parser.add_argument("--buffer", type=int, default=2, help="Rank Buffer for Hysteresis (default: 2)")
+    parser.add_argument("--label_horizon", type=int, default=1, help="Forward return label horizon in days (default: 1)")
     parser.add_argument("--seed", type=int, default=42, help="Random seed for reproducibility")
     parser.add_argument("--smooth_window", type=int, default=10, help="EWMA smoothing halflife (days). Higher = Lower Turnover.")
     return parser.parse_args()
@@ -59,7 +60,11 @@ def main() -> None:
     qlib.init(provider_uri=QLIB_PROVIDER_URI, region=QLIB_REGION)
 
     # 2. Data Loading
-    data_loader = ETFDataLoader(use_alpha158=args.use_alpha158, use_hybrid=args.use_hybrid)
+    data_loader = ETFDataLoader(
+        use_alpha158=args.use_alpha158, 
+        use_hybrid=args.use_hybrid,
+        label_horizon=args.label_horizon
+    )
     dataset = data_loader.load_data()
 
     # 3. Factor Analysis

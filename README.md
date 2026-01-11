@@ -88,13 +88,13 @@ The strategy now supports advanced position sizing:
 All runs are logged to `mlruns/`, viewable via the Dashboard or standard MLflow tools.
 
 ### Performance (Verification: 2023-Present)
-| Metric | Original Custom Strategy | **Final Optimized (Top 5 + Smooth 20 + Buffer)** |
+| Metric | Original Custom Strategy | **Final Optimized (Top 5 + 5-Day Horizon)** |
 | :--- | :--- | :--- |
-| **Annualized Return** | 8.56% | **11.49%** |
-| **Sharpe Ratio** | 0.77 | **0.88** |
-| **Annualized Turnover** | ~400% | **1130%** |
+| **Annualized Return** | 8.56% | **12.64%** |
+| **Sharpe Ratio** | 0.77 | **1.01** |
+| **Annualized Turnover** | ~400% | **1158%** |
 
-*Note: With 20-day smoothing, rank buffer hysteresis (2), and Top-K diversification (5), the strategy achieves superior stability and returns.*
+*Note: The strategy now targets a **5-Day Forward Return** (Long-Term Alpha) with Top-K (5) diversification and Z-Score feature neutralization.*
 
 ## Frontend Features
 -   **Bear Market Alert**: Visual warning when Benchmark Close < MA60.

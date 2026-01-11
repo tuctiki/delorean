@@ -38,7 +38,7 @@ class ETFDataHandler(DataHandlerLP):
         ]
         return custom_exprs, custom_names
 
-    def __init__(self, instruments: List[str], start_time: str, end_time: str, **kwargs: Any):
+    def __init__(self, instruments: List[str], start_time: str, end_time: str, label_horizon: int = 1, **kwargs: Any):
         """
         Initialize the ETFDataHandler.
 
@@ -46,6 +46,7 @@ class ETFDataHandler(DataHandlerLP):
             instruments (List[str]): List of ETF codes (e.g., ["510300.SH"]).
             start_time (str): Start date string (YYYY-MM-DD).
             end_time (str): End date string (YYYY-MM-DD).
+            label_horizon (int): Number of days for forward return label (default: 1).
             **kwargs: Additional arguments passed to DataHandlerLP.
         """
         custom_exprs, _ = self.get_custom_factors()
@@ -53,7 +54,7 @@ class ETFDataHandler(DataHandlerLP):
         data_loader_config = {
             "feature": custom_exprs, # Use the centralized definitions
             "label": [
-                "Ref($close, -1) / $close - 1"  # Next Day Return (Restored)
+                f"Ref($close, -{label_horizon}) / $close - 1"  # Dynamic Horizon Return
             ],
         }
         data_loader = {
@@ -80,17 +81,25 @@ class ETFDataHandler(DataHandlerLP):
 class ETFAlpha158DataHandler(Alpha158):
     """
     Custom Alpha158 DataHandler for ETF data.
-    Overrides label to match the strategy's target (Next Day Return).
+    Overrides label to match the strategy's target.
     """
+    def __init__(self, label_horizon: int = 1, **kwargs):
+        self.label_horizon = label_horizon
+        super().__init__(**kwargs)
+
     def get_label_config(self):
-        return ["Ref($close, -1) / $close - 1"]
+        return [f"Ref($close, -{self.label_horizon}) / $close - 1"]
 
 class ETFHybridDataHandler(Alpha158):
     """
     Hybrid DataHandler: Alpha158 + Custom Factors.
     """
+    def __init__(self, label_horizon: int = 1, **kwargs):
+        self.label_horizon = label_horizon
+        super().__init__(**kwargs)
+
     def get_label_config(self):
-        return ["Ref($close, -1) / $close - 1"]
+        return [f"Ref($close, -{self.label_horizon}) / $close - 1"]
         
     def get_feature_config(self):
         # Get Alpha158 features (Tuple of (expressions_list, names_list))
@@ -107,11 +116,12 @@ class ETFDataLoader:
     """
     Wrapper class to manage Qlib DatasetH creation and splitting.
     """
-    def __init__(self, use_alpha158: bool = False, use_hybrid: bool = False):
+    def __init__(self, use_alpha158: bool = False, use_hybrid: bool = False, label_horizon: int = 1):
         self.handler: Union[ETFDataHandler, ETFAlpha158DataHandler, ETFHybridDataHandler, None] = None
         self.dataset: Optional[DatasetH] = None
         self.use_alpha158 = use_alpha158
         self.use_hybrid = use_hybrid
+        self.label_horizon = label_horizon
 
     def load_data(self) -> DatasetH:
         """
@@ -121,25 +131,28 @@ class ETFDataLoader:
             DatasetH: The configured Qlib dataset object ready for training/inference.
         """
         if self.use_hybrid:
-            print("Initializing ETF Hybrid DataHandler (Alpha158 + Custom)...")
+            print(f"Initializing ETF Hybrid DataHandler (Alpha158 + Custom, H={self.label_horizon})...")
             self.handler = ETFHybridDataHandler(
                 instruments=ETF_LIST,
                 start_time=START_TIME,
                 end_time=END_TIME,
+                label_horizon=self.label_horizon
             )
         elif self.use_alpha158:
-            print("Initializing ETF Alpha158 DataHandler...")
+            print(f"Initializing ETF Alpha158 DataHandler (H={self.label_horizon})...")
             self.handler = ETFAlpha158DataHandler(
                 instruments=ETF_LIST,
                 start_time=START_TIME,
                 end_time=END_TIME,
+                label_horizon=self.label_horizon
             )
         else:
-            print("Initializing Custom ETF DataHandler...")
+            print(f"Initializing Custom ETF DataHandler (H={self.label_horizon})...")
             self.handler = ETFDataHandler(
                 instruments=ETF_LIST,
                 start_time=START_TIME,
                 end_time=END_TIME,
+                label_horizon=self.label_horizon
             )
         
         segments = {

@@ -26,7 +26,7 @@ def get_trading_signal(topk=5):
 
     # 2. Load Data (All available history)
     print("[1/5] Loading Data...")
-    data_loader = ETFDataLoader()
+    data_loader = ETFDataLoader(label_horizon=5)
     # We load standard dataset. The time range is controlled by constants.py (set to 2099)
     dataset = data_loader.load_data()
     
@@ -131,6 +131,7 @@ def get_trading_signal(topk=5):
         "topk": topk,
         "smooth_window": 20,
         "buffer": 2,
+        "label_horizon": 5,
         "mode": "Risk Parity + Dynamic Exposure"
     }
 
