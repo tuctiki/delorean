@@ -3,7 +3,11 @@ import pandas as pd
 import os
 import re
 
-from constants import ETF_LIST
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from delorean.config import ETF_LIST
 
 
 def get_etf_hist_data(symbol: str, start_date: str, end_date: str) -> pd.DataFrame:

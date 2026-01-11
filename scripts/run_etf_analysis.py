@@ -1,12 +1,16 @@
 import argparse
 import qlib
-from constants import QLIB_PROVIDER_URI, QLIB_REGION
-from data import ETFDataLoader
-from model import ModelTrainer
-from backtest import BacktestEngine
-from analysis import ResultAnalyzer, FactorAnalyzer
-from experiment_manager import ExperimentManager
-from feature_selection import FeatureSelector
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from delorean.config import QLIB_PROVIDER_URI, QLIB_REGION, BENCHMARK, START_TIME, END_TIME
+from delorean.data import ETFDataLoader
+from delorean.model import ModelTrainer
+from delorean.backtest import BacktestEngine
+from delorean.analysis import ResultAnalyzer, FactorAnalyzer
+from delorean.experiment_manager import ExperimentManager
+from delorean.feature_selection import FeatureSelector
 from qlib.workflow import R
 
 def parse_args() -> argparse.Namespace:
@@ -114,7 +118,7 @@ def main() -> None:
         # --- Market Regime Filter (MA200) ---
         print("Calculating Market Regime Signal (HS300 MA200)...")
         from qlib.data import D
-        from constants import BENCHMARK, START_TIME, END_TIME
+        from delorean.config import BENCHMARK, START_TIME, END_TIME
         
         # Load Benchmark Close Price
         # D.features returns MultiIndex (instrument, datetime)

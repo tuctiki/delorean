@@ -3,7 +3,7 @@ from qlib.contrib.strategy.signal_strategy import BaseSignalStrategy
 from qlib.backtest import backtest as qlib_backtest
 from qlib.backtest import executor as qlib_executor
 from qlib.backtest.decision import Order, OrderDir, TradeDecisionWO
-from constants import TEST_START_TIME, END_TIME, BENCHMARK
+from .config import TEST_START_TIME, END_TIME, BENCHMARK
 import pandas as pd
 import copy
 

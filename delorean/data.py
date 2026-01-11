@@ -3,7 +3,7 @@ from qlib.data.dataset import DatasetH
 from qlib.data.dataset.handler import DataHandlerLP
 from qlib.data.dataset.processor import CSZScoreNorm, DropnaLabel
 from qlib.contrib.data.handler import Alpha158
-from constants import ETF_LIST, START_TIME, END_TIME, TRAIN_END_TIME, TEST_START_TIME
+from .config import ETF_LIST, START_TIME, END_TIME, TRAIN_END_TIME, TEST_START_TIME
 
 class ETFDataHandler(DataHandlerLP):
     """

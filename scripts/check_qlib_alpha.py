@@ -1,6 +1,10 @@
 import qlib
 from qlib.config import REG_CN
-from constants import QLIB_PROVIDER_URI, QLIB_REGION
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from delorean.config import QLIB_PROVIDER_URI, QLIB_REGION
 from qlib.contrib.data.handler import Alpha158
 
 try:

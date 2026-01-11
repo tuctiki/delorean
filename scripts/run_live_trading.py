@@ -1,10 +1,14 @@
 import qlib
 import pandas as pd
 import datetime
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from qlib.workflow import R
-from constants import QLIB_PROVIDER_URI, QLIB_REGION
-from data import ETFDataLoader
-from model import ModelTrainer
+from delorean.config import QLIB_PROVIDER_URI, QLIB_REGION, BENCHMARK
+from delorean.data import ETFDataLoader
+from delorean.model import ModelTrainer
 
 def get_trading_signal(topk=4):
     """
@@ -78,7 +82,7 @@ def get_trading_signal(topk=4):
     # --- Market Regime Check (Live) ---
     print("\n[Market Regime Check]")
     from qlib.data import D
-    from constants import BENCHMARK
+    from delorean.config import BENCHMARK
     
     # Fetch last 300 days of benchmark to be safe
     # Qlib 'start_time' needs string or pd.Timestamp
@@ -92,9 +96,13 @@ def get_trading_signal(topk=4):
         bench_close['ma60'] = bench_close['close'].rolling(window=60).mean()
         
         # Latest regime
+        is_bull = True # Default
+        last_close = 0.0
+        last_ma60 = 0.0
+        
         try:
-            last_close = bench_close.loc[latest_date, 'close']
-            last_ma60 = bench_close.loc[latest_date, 'ma60']
+            last_close = float(bench_close.loc[latest_date, 'close'])
+            last_ma60 = float(bench_close.loc[latest_date, 'ma60'])
             is_bull = last_close > last_ma60
             
             print(f"Benchmark ({BENCHMARK}) Close: {last_close:.2f}")
@@ -105,14 +113,47 @@ def get_trading_signal(topk=4):
                 print("WARNING: BEAR MARKET DETECTED (Price < MA60)")
                 print("STRATEGY RECOMMENDATION: LIQUIDATE ALL (CASH)")
                 print("!"*40)
-                # Override output? Or just warn. 
-                # Better to just warn heavily but still show relative ranks if user insists.
             else:
                 print("Status: BULL Market (Price > MA60). Trading Active.")
         except KeyError:
              print("Warning: Could not calculate MA60 for latest date (Data missing?). Assuming Bull.")
     else:
         print("Warning: Benchmark data not found.")
+        is_bull = True
+        last_close = 0.0
+        last_ma60 = 0.0
+
+    
+    # [NEW] Save Daily Recommendations Artifact for Frontend
+    rec_artifact = {
+        "date": latest_date.strftime('%Y-%m-%d'),
+        "market_status": "Bear" if (bench_df.empty or not is_bull) else "Bull",
+        "market_data": {
+            "benchmark_close": last_close,
+            "benchmark_ma60": last_ma60
+        },
+        "top_recommendations": [],
+        "full_rankings": []
+    }
+    
+    # Top K
+    for symbol, score in latest_pred.head(topk).items():
+        rec_artifact["top_recommendations"].append({
+            "symbol": symbol,
+            "score": float(score)
+        })
+        
+    # Full list (limit to top 50 to avoid huge json if needed, or all)
+    for symbol, score in latest_pred.items():
+         rec_artifact["full_rankings"].append({
+            "symbol": symbol,
+            "score": float(score)
+        })
+        
+    import json
+    with open("daily_recommendations.json", "w") as f:
+        json.dump(rec_artifact, f, indent=2)
+    print(f"\n[Artifact] Saved recommendations to 'daily_recommendations.json'")
 
     print("\n" + "-"*30)
     print(f"  Top {topk} Recommendations")

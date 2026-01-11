@@ -3,7 +3,7 @@ from qlib.contrib.evaluate import risk_analysis
 from qlib.data.dataset import DatasetH
 import pandas as pd
 import matplotlib.pyplot as plt
-from constants import OUTPUT_DIR
+from .config import OUTPUT_DIR
 import os
 
 class ResultAnalyzer:

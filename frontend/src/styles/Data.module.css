@@ -1,0 +1,100 @@
+.container {
+    display: flex;
+    gap: 2rem;
+    height: calc(100vh - 100px);
+    /* Fill available height minus navbar */
+}
+
+.sidebar {
+    width: 250px;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem;
+    overflow: hidden;
+}
+
+.searchBox {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 0.5rem 0.8rem;
+    border-radius: 6px;
+    border: 1px solid transparent;
+}
+
+.searchBox:focus-within {
+    border-color: var(--accent);
+}
+
+.input {
+    background: transparent;
+    border: none;
+    color: var(--text-primary);
+    width: 100%;
+    outline: none;
+}
+
+.etfList {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.etfItem {
+    padding: 0.5rem 0.8rem;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: background 0.2s;
+    color: var(--text-secondary);
+}
+
+.etfItem:hover {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-primary);
+}
+
+.active {
+    background: rgba(88, 166, 255, 0.1);
+    color: var(--accent);
+    font-weight: 600;
+}
+
+.content {
+    flex: 1;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+}
+
+.placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: var(--text-secondary);
+    font-style: italic;
+}
+
+.chartTitle {
+    margin: 0 0 1.5rem 0;
+    font-size: 1.5rem;
+}
+
+.chartContainer {
+    flex: 1;
+    min-height: 0;
+}
+
+.loading {
+    color: var(--text-secondary);
+}

@@ -2,7 +2,11 @@
 import qlib
 from qlib.data import D
 import pandas as pd
-from constants import QLIB_PROVIDER_URI, QLIB_REGION
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from delorean.config import QLIB_PROVIDER_URI, QLIB_REGION
 
 qlib.init(provider_uri=QLIB_PROVIDER_URI, region=QLIB_REGION)
 
