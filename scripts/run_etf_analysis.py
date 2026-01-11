@@ -84,6 +84,12 @@ def main() -> None:
         exp_name = "ETF_Strategy_Refactored"
         
     with R.start(experiment_name=exp_name) as recorder:
+        # Log all arguments as experiment parameters
+        # Ensure all values are strings for MLflow compatibility
+        params = {k: str(v) for k, v in vars(args).items()}
+        print(f"Logging Params: {params}")
+        R.log_params(**params)
+        
         model_trainer.train(dataset)
         pred = model_trainer.predict(dataset)
         

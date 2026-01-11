@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import useSWR from 'swr';
 import { Play, Activity, TrendingUp, AlertTriangle, RefreshCw } from 'lucide-react';
+import AllocationChart from '../components/AllocationChart';
 import styles from '../styles/Home.module.css';
 
 const fetcher = (...args) => fetch(...args).then(res => res.json());
@@ -43,8 +44,8 @@ export default function Home() {
       <h1 className={styles.title}>Dashboard</h1>
 
       <div className={styles.grid}>
-        {/* Daily Task Card */}
-        <div className={styles.card}>
+        {/* Row 1: Status & Controls */}
+        <div className={`${styles.card} ${styles.col4}`}>
           <div className={styles.cardHeader}>
             <h2><Activity size={20} /> Daily Task</h2>
             <button
@@ -52,7 +53,7 @@ export default function Home() {
               onClick={handleRun}
               disabled={isRunning}
             >
-              {isRunning ? 'Running...' : 'Run Daily Update'} <Play size={16} />
+              {isRunning ? 'Running...' : 'Run'} <Play size={16} />
             </button>
           </div>
           <div className={styles.console} ref={consoleRef}>
@@ -60,8 +61,7 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Strategy Config Card */}
-        <div className={styles.card}>
+        <div className={`${styles.card} ${styles.col4}`}>
           <div className={styles.cardHeader}>
             <h2><RefreshCw size={20} /> Active Strategy</h2>
           </div>
@@ -78,11 +78,14 @@ export default function Home() {
               <span>Smoothing</span>
               <strong>{recs?.strategy_config?.smooth_window || 10}d</strong>
             </div>
+            <div className={styles.statRow}>
+              <span>Label Horizon</span>
+              <strong>{recs?.strategy_config?.label_horizon || 1}d</strong>
+            </div>
           </div>
         </div>
 
-        {/* Market Status Card */}
-        <div className={styles.card}>
+        <div className={`${styles.card} ${styles.col4}`}>
           <div className={styles.cardHeader}>
             <h2><TrendingUp size={20} /> Market Status</h2>
             <div className={`${styles.badge} ${isMarketBull ? styles.bull : styles.bear}`}>
@@ -106,14 +109,20 @@ export default function Home() {
           )}
         </div>
 
-        {/* Recommendations Card */}
-        <div className={styles.card}>
+        {/* Row 2: Recommendations List (Left) */}
+        <div className={`${styles.card} ${styles.col8}`}>
           <div className={styles.cardHeader}>
             <h2>Top Recommendations</h2>
-            <span className={styles.date}>{recs?.date || ''}</span>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+              <span className={styles.date}>{recs?.date || ''}</span>
+              {recs?.generation_time && (
+                <span style={{ fontSize: '0.75rem', color: '#58a6ff', opacity: 0.8 }}>
+                  Generated: {recs.generation_time}
+                </span>
+              )}
+            </div>
           </div>
           <div className={styles.list}>
-            {/* Header Row */}
             {!recError && recs?.top_recommendations?.length > 0 && (
               <div className={styles.listHeader}>
                 <div className={styles.rank} title="Rank based on Model Score">#</div>
@@ -133,7 +142,6 @@ export default function Home() {
                   </div>
                   <div className={styles.symbol}>{item.symbol}</div>
 
-                  {/* Allocation Column */}
                   <div className={styles.allocation}>
                     {item.target_weight ? `${(item.target_weight * 100).toFixed(1)}%` : '-'}
                   </div>
@@ -150,6 +158,18 @@ export default function Home() {
               <div className={styles.placeholder}>No recommendations. Run daily task.</div>
             )}
           </div>
+        </div>
+
+        {/* Row 2: Allocation Chart (Right) */}
+        <div className={`${styles.card} ${styles.col4}`}>
+          <div className={styles.cardHeader}>
+            <h2>Portfolio Allocation</h2>
+          </div>
+          {recs?.top_recommendations ? (
+            <AllocationChart recommendations={recs.top_recommendations} />
+          ) : (
+            <div className={styles.placeholder}>No data</div>
+          )}
         </div>
       </div>
     </div>

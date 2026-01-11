@@ -137,6 +137,7 @@ def get_trading_signal(topk=5):
 
     rec_artifact = {
         "date": latest_date.strftime('%Y-%m-%d'),
+        "generation_time": datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
         "market_status": "Bear" if (bench_df.empty or not is_bull) else "Bull",
         "market_data": {
             "benchmark_close": last_close,

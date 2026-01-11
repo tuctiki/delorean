@@ -129,10 +129,20 @@ def list_experiments():
         for d in os.listdir(mlruns_path):
             full_path = os.path.join(mlruns_path, d)
             if os.path.isdir(full_path) and d.isdigit():
-                 # Read meta.yaml if possible
-                 experiments.append({"id": d, "name": f"Experiment {d}", "artifact_location": full_path})
-    # Sort by ID descending
-    experiments.sort(key=lambda x: int(x["id"]), reverse=True)
+                 # Get creation time (using mtime as proxy for folder creation/update)
+                 # Better to check meta.yaml mtime if exists
+                 creation_time = os.path.getmtime(full_path)
+                 creation_str = pd.Timestamp(creation_time, unit='s').strftime('%Y-%m-%d %H:%M:%S')
+                 
+                 experiments.append({
+                     "id": d, 
+                     "name": f"Experiment {d}", 
+                     "artifact_location": full_path,
+                     "creation_time": creation_str,
+                     "timestamp": creation_time
+                 })
+    # Sort by Timestamp Descending (Reverse Order)
+    experiments.sort(key=lambda x: x["timestamp"], reverse=True)
     return experiments
 
 @app.get("/api/experiments/{experiment_id}")

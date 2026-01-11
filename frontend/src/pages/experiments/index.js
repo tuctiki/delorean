@@ -19,6 +19,9 @@ export default function Experiments() {
                         </div>
                         <div className={styles.content}>
                             <h3>Experiment #{exp.id}</h3>
+                            <p className={styles.path} style={{ fontSize: '0.8rem', color: '#58a6ff', marginTop: '4px' }}>
+                                Generated: {exp.creation_time}
+                            </p>
                             <p className={styles.path}>{exp.artifact_location}</p>
                         </div>
                         <div className={styles.actions}>
