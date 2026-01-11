@@ -16,7 +16,7 @@ def run_backtest(seed):
     print(f"{'='*40}")
     
     cmd = [
-        "python", "scripts/run_etf_analysis.py",
+        sys.executable, "scripts/run_etf_analysis.py",
         "--topk", "4",
         "--risk_parity",
         "--dynamic_exposure",

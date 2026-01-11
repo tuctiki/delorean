@@ -103,7 +103,7 @@ def run_daily_task(background_tasks: BackgroundTasks):
     
     # Use standard python command
     TASK_PROCESS = subprocess.Popen(
-        ["python", "-u", "scripts/run_daily_task.py"],
+        [sys.executable, "-u", "scripts/run_daily_task.py"],
         cwd=project_root, 
         stdout=log_file,
         stderr=subprocess.STDOUT

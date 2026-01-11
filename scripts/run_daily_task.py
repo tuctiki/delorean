@@ -25,7 +25,7 @@ def main():
     print("="*50)
     
     # 1. Download Latest Data
-    step1_cmd = "python scripts/download_etf_data_to_csv.py"
+    step1_cmd = f"{sys.executable} scripts/download_etf_data_to_csv.py"
     run_step(step1_cmd, "Step 1/3: Download Data from AkShare")
     
     # 2. Update Qlib Database (Binary Dump)
@@ -35,7 +35,7 @@ def main():
     
     # Constructing the complex dumping command
     qlib_dump_cmd = (
-        "python vendors/qlib/scripts/dump_bin.py dump_all "
+        f"{sys.executable} vendors/qlib/scripts/dump_bin.py dump_all "
         "--data_path ~/.qlib/csv_data/akshare_etf_data "
         "--qlib_dir ~/.qlib/qlib_data/cn_etf_data "
         "--freq day "
@@ -47,7 +47,7 @@ def main():
     run_step(qlib_dump_cmd, "Step 2/3: Update Qlib Database")
     
     # 3. Generate Signals
-    step3_cmd = "python scripts/run_live_trading.py"
+    step3_cmd = f"{sys.executable} scripts/run_live_trading.py"
     run_step(step3_cmd, "Step 3/3: Generate Signal Recommendations")
     
     print("\n" + "="*50)

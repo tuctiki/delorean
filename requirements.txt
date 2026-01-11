@@ -1,0 +1,12 @@
+qlib>=0.9.0
+akshare
+pandas>=2.0.0
+numpy
+lightgbm
+torch
+gymnasium
+fastapi
+uvicorn
+mlflow
+scikit-learn
+matplotlib
