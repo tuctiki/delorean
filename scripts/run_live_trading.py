@@ -9,6 +9,8 @@ from qlib.workflow import R
 from delorean.config import QLIB_PROVIDER_URI, QLIB_REGION, BENCHMARK, ETF_NAME_MAP
 from delorean.data import ETFDataLoader
 from delorean.model import ModelTrainer
+from delorean.backtest import BacktestEngine
+from qlib.contrib.evaluate import risk_analysis
 
 def get_trading_signal(topk=5):
     """
@@ -63,6 +65,113 @@ def get_trading_signal(topk=5):
     # Let's just run standard training for now to keep it consistent with backtest.
     # (Improvement: Update train_period in data.py dynamically, but that edits code).
     model_trainer.train(dataset)
+    
+    # [Validation] Post-Training Checks
+    print("\n" + "="*40)
+    print("[Validation] Performing Post-Training Checks...")
+    
+    validation_metrics = {
+        "rank_ic": None,
+        "sharpe": None,
+        "ic_status": "Unknown",
+        "sharpe_status": "Unknown"
+    }
+
+    try:
+        # 1. Prepare Data (Last 6 Months of Train)
+        # Getting the raw dataframe from the dataset's train segment
+        df_train = dataset.prepare("train", col_set=["feature", "label"])
+        
+        # Filter for last ~6 months (126 trading days)
+        # We use a date-based filter to be precise
+        valid_start_date = pd.Timestamp(train_end) - pd.Timedelta(days=180)
+        
+        # Ensure index is datetime level for filtering
+        # df_train index is (datetime, instrument) usually
+        df_val = df_train.loc[df_train.index.get_level_values('datetime') >= valid_start_date]
+        
+        if not df_val.empty:
+            if model_trainer.selected_features:
+                X_val = df_val["feature"][model_trainer.selected_features]
+            else:
+                X_val = df_val["feature"]
+            y_val = df_val["label"]
+            
+            # Predict
+            # Handle Qlib LGBModel vs Native Booster
+            if hasattr(model_trainer.model, "model"):
+                # Qlib LGBModel -> Inner Booster
+                pred_val_scores = model_trainer.model.model.predict(X_val)
+            else:
+                # Native Booster
+                pred_val_scores = model_trainer.model.predict(X_val)
+            pred_val = pd.Series(pred_val_scores, index=X_val.index)
+            
+            # --- Check 1: Rank IC ---
+            # Align
+            val_res = pd.DataFrame({"score": pred_val, "label": y_val.iloc[:, 0]}).dropna()
+            
+            # Group by date
+            daily_ic = val_res.groupby(level='datetime').apply(lambda x: x["score"].corr(x["label"], method="spearman"))
+            mean_ic = daily_ic.mean()
+            
+            print(f"  > Recent 6-Month Rank IC: {mean_ic:.4f}")
+            validation_metrics["rank_ic"] = float(mean_ic)
+            
+            if mean_ic < 0.035:
+                print("!"*40)
+                print(f"CRITICAL WARNING: Rank IC ({mean_ic:.4f}) < 0.035")
+                print("The model predictive power is low. Signals may be unreliable.")
+                print("!"*40)
+                validation_metrics["ic_status"] = "Critical"
+            else:
+                print("    [PASS] Rank IC > 0.035")
+                validation_metrics["ic_status"] = "Pass"
+                
+            # --- Check 2: Sharpe Ratio (Simulated) ---
+            # Last 60 days
+            sharpe_start_date = pd.Timestamp(train_end) - pd.Timedelta(days=90)
+            pred_sharpe = pred_val.loc[pred_val.index.get_level_values('datetime') >= sharpe_start_date]
+            
+            if not pred_sharpe.empty:
+                print(f"  > Simulating recent performance (from {sharpe_start_date.date()})...")
+                # Run Mini Backtest
+                engine = BacktestEngine(pred_sharpe)
+                # Suppress verbose output for clean log
+                report_val, _ = engine.run(topk=topk) 
+                
+                risks = risk_analysis(report_val["return"], freq="day")
+                sharpe = risks.loc["information_ratio", "risk"]
+                
+                print(f"  > Recent Simulated Sharpe: {sharpe:.4f}")
+                validation_metrics["sharpe"] = float(sharpe)
+                
+                if sharpe < 0.4:
+                     print("!"*40)
+                     print(f"ERROR: Sharpe Ratio ({sharpe:.4f}) < 0.4")
+                     print("Recent performance is very poor.")
+                     print("!"*40)
+                     validation_metrics["sharpe_status"] = "Error"
+                elif sharpe < 0.6:
+                     print("!"*40)
+                     print(f"WARNING: Sharpe Ratio ({sharpe:.4f}) < 0.6")
+                     print("Recent performance is suboptimal.")
+                     print("!"*40)
+                     validation_metrics["sharpe_status"] = "Warning"
+                else:
+                     print("    [PASS] Sharpe > 0.6")
+                     validation_metrics["sharpe_status"] = "Pass"
+            else:
+                print("  > Not enough data for Sharpe check.")
+        else:
+            print("  > Not enough training data for validation.")
+            
+    except Exception as e:
+        print(f"Warning: Validation checks failed: {e}")
+        import traceback
+        traceback.print_exc()
+        
+    print("="*40 + "\n")
     
     # 4. Predict (Inference)
     print("[3/5] Generating Predictions...")
@@ -153,6 +262,7 @@ def get_trading_signal(topk=5):
         "date": latest_date.strftime('%Y-%m-%d'),
         "generation_time": datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
         "market_status": "Bear" if (bench_df.empty or not is_bull) else "Bull",
+        "validation": validation_metrics,
         "market_data": {
             "benchmark_close": last_close,
             "benchmark_ma60": last_ma60

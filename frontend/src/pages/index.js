@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import useSWR from 'swr';
-import { Play, Activity, TrendingUp, AlertTriangle, RefreshCw } from 'lucide-react';
+import { Play, Activity, TrendingUp, AlertTriangle, RefreshCw, ShieldCheck } from 'lucide-react';
 import Layout from '../components/Layout';
 import AllocationChart from '../components/AllocationChart';
 import styles from '../styles/Home.module.css';
@@ -41,6 +41,14 @@ export default function Home() {
 
   const isMarketBull = recs?.market_status === 'Bull';
 
+  // Validation Colors
+  const getStatusColor = (status) => {
+    if (status === 'Pass') return '#2ecc71'; // Green
+    if (status === 'Warning') return '#f1c40f'; // Yellow
+    if (status === 'Critical' || status === 'Error') return '#e74c3c'; // Red
+    return '#8b949e'; // Grey
+  };
+
   return (
 
 
@@ -51,8 +59,8 @@ export default function Home() {
         </div>
 
 
-        {/* Row 1: Status & Controls */}
-        <div className={`${styles.card} ${styles.col4}`}>
+        {/* Row 1: Status & Controls, Strategy, Market, Validation */}
+        <div className={`${styles.card} ${styles.col3}`}>
           <div className={styles.cardHeader}>
             <h2><Activity size={20} /> Daily Task</h2>
             <button
@@ -68,7 +76,7 @@ export default function Home() {
           </div>
         </div>
 
-        <div className={`${styles.card} ${styles.col4}`}>
+        <div className={`${styles.card} ${styles.col3}`}>
           <div className={styles.cardHeader}>
             <h2><RefreshCw size={20} /> Active Strategy</h2>
           </div>
@@ -92,7 +100,7 @@ export default function Home() {
           </div>
         </div>
 
-        <div className={`${styles.card} ${styles.col4}`}>
+        <div className={`${styles.card} ${styles.col3}`}>
           <div className={styles.cardHeader}>
             <h2><TrendingUp size={20} /> Market Status</h2>
             <div className={`${styles.badge} ${isMarketBull ? styles.bull : styles.bear}`}>
@@ -112,6 +120,31 @@ export default function Home() {
           {!isMarketBull && recs && (
             <div className={styles.alert}>
               <AlertTriangle size={16} /> Bear Market. Cash Recommended.
+            </div>
+          )}
+        </div>
+
+        <div className={`${styles.card} ${styles.col3}`}>
+          <div className={styles.cardHeader}>
+            <h2><ShieldCheck size={20} /> Model Health</h2>
+          </div>
+          <div className={styles.stats}>
+            <div className={styles.statRow}>
+              <span title="Rank IC (Last 6 Months)">Rank IC</span>
+              <strong style={{ color: getStatusColor(recs?.validation?.ic_status) }}>
+                {recs?.validation?.rank_ic ? recs.validation.rank_ic.toFixed(4) : '-'}
+              </strong>
+            </div>
+            <div className={styles.statRow}>
+              <span title="Simulated Sharpe (Last 60 Days)">Sharpe (60d)</span>
+              <strong style={{ color: getStatusColor(recs?.validation?.sharpe_status) }}>
+                {recs?.validation?.sharpe ? recs.validation.sharpe.toFixed(4) : '-'}
+              </strong>
+            </div>
+          </div>
+          {(recs?.validation?.ic_status === 'Critical' || recs?.validation?.sharpe_status === 'Error') && (
+            <div className={styles.alert} style={{ marginTop: 'auto' }}>
+              <AlertTriangle size={16} /> Model Degraded
             </div>
           )}
         </div>
