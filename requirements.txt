@@ -1,4 +1,4 @@
-qlib>=0.9.0
+pyqlib==0.9.7
 akshare
 pandas>=2.0.0
 numpy

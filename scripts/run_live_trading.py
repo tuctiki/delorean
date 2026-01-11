@@ -27,8 +27,22 @@ def get_trading_signal(topk=5):
     # 2. Load Data (All available history)
     print("[1/5] Loading Data...")
     data_loader = ETFDataLoader(label_horizon=5)
-    # We load standard dataset. The time range is controlled by constants.py (set to 2099)
-    dataset = data_loader.load_data()
+    # [Live Trading Config] 
+    # Dynamic split to ensure we train on full history
+    # We use a robust split: Train up to 14 days ago, Test from 14 days ago.
+    # This ensures 'Test' is never empty even if data lags, and we always get the latest available signal.
+    today = datetime.datetime.now()
+    split_date = today - datetime.timedelta(days=14)
+    
+    train_end = (split_date - datetime.timedelta(days=1)).strftime("%Y-%m-%d")
+    test_start = split_date.strftime("%Y-%m-%d")
+    
+    print(f"Live Mode: Training on History up to {train_end}")
+    print(f"           Testing/Inference from {test_start}")
+    
+    data_loader = ETFDataLoader(label_horizon=5)
+    # Override segments for live trading
+    dataset = data_loader.load_data(train_end=train_end, test_start=test_start)
     
     # 3. Train Model
     # In live trading, we ideally retrain on ALL past data to get best prediction for tomorrow
