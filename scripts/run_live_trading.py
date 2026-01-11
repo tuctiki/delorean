@@ -132,7 +132,7 @@ def get_trading_signal(topk=5):
         "smooth_window": 20,
         "buffer": 2,
         "label_horizon": 5,
-        "mode": "Risk Parity + Dynamic Exposure"
+        "mode": "Equal Weight + Dynamic Exposure"
     }
 
     rec_artifact = {
@@ -176,18 +176,8 @@ def get_trading_signal(topk=5):
         except Exception as e:
             print(f"Warning: Failed to parse Volatility data: {e}")
 
-    # Calculate Target Weights (Risk Parity on Top K)
-    # 1. Get Vols for Top K
-    topk_candidates = latest_pred.head(topk).index
-    inv_vols = {}
-    sum_inv_vol = 0.0
-    
-    for symbol in topk_candidates:
-         vol_raw = vol_map.get(symbol, 0.0)
-         if pd.isna(vol_raw) or vol_raw <= 0: vol_raw = 0.01 # Avoid div by zero, assume low risk/avg
-         inv_vol = 1.0 / vol_raw
-         inv_vols[symbol] = inv_vol
-         sum_inv_vol += inv_vol
+    # Calculate Target Weights (Equal Weight on Top K)
+    # Volatility is fetched for display only.
          
     # 2. Populate Recommendations with Weights
     # We Iterate larger than topk to capture Buffer items too if needed for display
@@ -199,13 +189,10 @@ def get_trading_signal(topk=5):
         vol_raw = vol_map.get(symbol, 0.0)
         close_price = close_map.get(symbol, 0.0)
         
-        # Weight Calculation (Only for Top K)
+        # Weight Calculation (Only for Top K) - EQUAL WEIGHT (Default)
         weight = 0.0
         if i <= topk:
-            if sum_inv_vol > 0:
-                 weight = inv_vols.get(symbol, 0.0) / sum_inv_vol
-            else:
-                 weight = 1.0 / topk
+             weight = 1.0 / topk
         
         item = {
             "rank": i,

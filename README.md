@@ -58,16 +58,12 @@ python scripts/run_daily_task.py
 
 ### 3. Training & Backtesting Analysis
 
-To run research experiments:
-
-### 3. Training & Backtesting Analysis
-
 To run research experiments (e.g., Stress Test 2015-2025):
 
 ```bash
 export PYTHONPATH=$PYTHONPATH:.
 python scripts/run_etf_analysis.py \
-  --topk 5 --risk_parity --dynamic_exposure --seed 42 \
+  --topk 5 --dynamic_exposure --seed 42 \
   --smooth_window 20 --buffer 2 --label_horizon 5 \
   --start_time 2015-01-01 \
   --end_time 2025-12-31 \
@@ -78,8 +74,8 @@ python scripts/run_etf_analysis.py \
 **Options:**
 -   `--label_horizon <int>`: Forecast horizon in days (default: 5).
 -   `--smooth_window <int>`: EWMA smoothing for signals (default: 20).
--   `--risk_parity`: Enable Volatility Targeting (1/Vol weighting).
 -   `--dynamic_exposure`: Enable Trend-based Dynamic Exposure (Manage Beta).
+-   `--risk_parity`: Enable Volatility Targeting (Optional, 1/Vol weighting).
 -   `--start_time / --end_time`: Data range overrides.
 -   `--train_end_time / --test_start_time`: Split configuration.
 
@@ -89,9 +85,9 @@ python scripts/run_etf_analysis.py \
 -   **Custom Strategy**: Momentum + Volatility + Reversal factors. (Best risk-adjusted return).
 -   **Optimization**: Uses **Cross-Sectional Z-Score** Feature Neutralization and **5-Day Forward Return** Label.
 
-### Position Control (New)
+### Position Control
 The strategy now supports advanced position sizing:
--   **Volatility Targeting (Risk Parity)**: Allocates capital inversely proportional to risk (`1/VOL20`). Includes **Buffer Rebalancing** to minimize noise trading.
+-   **Equal Weight (Default)**: Allocates capital equally among Top 5 holdings.
 -   **Dynamic Market Exposure**: Adjusts equity exposure (0% - 99%) based on the Benchmark Trend Strength (Close vs MA60) with **Hysteresis** to prevent whipsaws.
 
 ### Experiment Tracking
@@ -101,8 +97,8 @@ All runs are logged to `mlruns/`, viewable via the Dashboard.
 ### Performance (Stress Test: 2022-Present)
 | Metric | Result (Train 2015-2021) |
 | :--- | :--- |
-| **Annualized Return** | **11.26%** |
-| **Sharpe Ratio** | **0.86** |
+| **Annualized Return** | **11.15%** |
+| **Sharpe Ratio** | **0.85** |
 | **Max Drawdown** | **-11.65%** |
 | **Test Period** | 2022-01-01 to 2025-12-31 |
 
