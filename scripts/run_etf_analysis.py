@@ -27,6 +27,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--label_horizon", type=int, default=1, help="Forward return label horizon in days (default: 1)")
     parser.add_argument("--seed", type=int, default=42, help="Random seed for reproducibility")
     parser.add_argument("--smooth_window", type=int, default=10, help="EWMA smoothing halflife (days). Higher = Lower Turnover.")
+    
+    # Time Range Overrides
+    parser.add_argument("--start_time", type=str, default=None, help="Backtest Data Start Time (e.g. 2015-01-01)")
+    parser.add_argument("--train_end_time", type=str, default=None, help="Training End Time (e.g. 2021-12-31)")
+    parser.add_argument("--test_start_time", type=str, default=None, help="Test Start Time (e.g. 2022-01-01)")
+    parser.add_argument("--end_time", type=str, default=None, help="Backtest End Time (e.g. 2025-12-31)")
+    
     return parser.parse_args()
 
 def fix_seed(seed: int) -> None:
@@ -59,13 +66,25 @@ def main() -> None:
     # 1. Initialize Qlib
     qlib.init(provider_uri=QLIB_PROVIDER_URI, region=QLIB_REGION)
 
+    # Time Config Overrides
+    start_time = args.start_time if args.start_time else START_TIME
+    end_time = args.end_time if args.end_time else END_TIME
+
     # 2. Data Loading
     data_loader = ETFDataLoader(
         use_alpha158=args.use_alpha158, 
         use_hybrid=args.use_hybrid,
-        label_horizon=args.label_horizon
+        label_horizon=args.label_horizon,
+        start_time=start_time,
+        end_time=end_time
     )
-    dataset = data_loader.load_data()
+    
+    dataset = data_loader.load_data(
+        train_start=start_time,
+        train_end=args.train_end_time,
+        test_start=args.test_start_time,
+        test_end=end_time
+    )
 
     # 3. Factor Analysis
     factor_analyzer = FactorAnalyzer()
@@ -236,7 +255,7 @@ def main() -> None:
         for p in plots:
              p_path = os.path.join("artifacts", p) # Analyzer saves to artifacts/
              if os.path.exists(p_path):
-                 recorder.log_artifact(p_path)
+                 R.log_artifact(p_path)
 
         # 6. Analysis
 

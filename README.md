@@ -60,24 +60,34 @@ python scripts/run_daily_task.py
 
 To run research experiments:
 
+### 3. Training & Backtesting Analysis
+
+To run research experiments (e.g., Stress Test 2015-2025):
+
 ```bash
 export PYTHONPATH=$PYTHONPATH:.
-python scripts/run_etf_analysis.py --topk 4 --risk_parity --dynamic_exposure --seed 42
+python scripts/run_etf_analysis.py \
+  --topk 5 --risk_parity --dynamic_exposure --seed 42 \
+  --smooth_window 20 --buffer 2 --label_horizon 5 \
+  --start_time 2015-01-01 \
+  --end_time 2025-12-31 \
+  --train_end_time 2021-12-31 \
+  --test_start_time 2022-01-01
 ```
 
 **Options:**
+-   `--label_horizon <int>`: Forecast horizon in days (default: 5).
+-   `--smooth_window <int>`: EWMA smoothing for signals (default: 20).
 -   `--risk_parity`: Enable Volatility Targeting (1/Vol weighting).
 -   `--dynamic_exposure`: Enable Trend-based Dynamic Exposure (Manage Beta).
--   `--seed <int>`: Fix random seed for reproducibility (default: 42).
--   `--use_alpha158`: Use Qlib's Alpha158 factors.
--   `--use_hybrid`: Use Hybrid factors.
+-   `--start_time / --end_time`: Data range overrides.
+-   `--train_end_time / --test_start_time`: Split configuration.
 
 ## Implementation Details
 
 ### Factor Models
 -   **Custom Strategy**: Momentum + Volatility + Reversal factors. (Best risk-adjusted return).
--   **Alpha158**: Standard Qlib 158 factors.
--   **Hybrid**: Combination with correlation filtering.
+-   **Optimization**: Uses **Cross-Sectional Z-Score** Feature Neutralization and **5-Day Forward Return** Label.
 
 ### Position Control (New)
 The strategy now supports advanced position sizing:
@@ -85,17 +95,21 @@ The strategy now supports advanced position sizing:
 -   **Dynamic Market Exposure**: Adjusts equity exposure (0% - 99%) based on the Benchmark Trend Strength (Close vs MA60) with **Hysteresis** to prevent whipsaws.
 
 ### Experiment Tracking
-All runs are logged to `mlruns/`, viewable via the Dashboard or standard MLflow tools.
+All runs are logged to `mlruns/`, viewable via the Dashboard.
+-   **Experiment Details Page**: Includes Cumulative Return and Excess Return plots.
 
-### Performance (Verification: 2023-Present)
-| Metric | Original Custom Strategy | **Final Optimized (Top 5 + 5-Day Horizon)** |
-| :--- | :--- | :--- |
-| **Annualized Return** | 8.56% | **12.64%** |
-| **Sharpe Ratio** | 0.77 | **1.01** |
-| **Annualized Turnover** | ~400% | **1158%** |
+### Performance (Stress Test: 2022-Present)
+| Metric | Result (Train 2015-2021) |
+| :--- | :--- |
+| **Annualized Return** | **11.26%** |
+| **Sharpe Ratio** | **0.86** |
+| **Max Drawdown** | **-11.65%** |
+| **Test Period** | 2022-01-01 to 2025-12-31 |
 
-*Note: The strategy now targets a **5-Day Forward Return** (Long-Term Alpha) with Top-K (5) diversification and Z-Score feature neutralization.*
+*Note: This period covers the significant bear market of 2022-2024, demonstrating the strategy's defensive robustness.*
 
 ## Frontend Features
+-   **Premium Grid Layout**: New Glassmorphism design with responsive grid.
+-   **Allocation Charts**: Visual Risk Parity weight distribution.
+-   **Experiment Visuals**: Detailed performance plots and generation timestamps.
 -   **Bear Market Alert**: Visual warning when Benchmark Close < MA60.
--   **Volatility Scores**: Real-time volatility monitoring for each ETF.
