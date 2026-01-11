@@ -24,6 +24,35 @@ export default function ExperimentDetail() {
             <h1 className={styles.title}>Experiment #{id}</h1>
 
             <div className={styles.grid}>
+                {/* Charts Card */}
+                <div className={styles.card} style={{ gridColumn: '1 / -1' }}>
+                    <div className={styles.cardHeader}>
+                        <TrendingUp size={20} /> Performance Plots
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', padding: '20px' }}>
+                        <div>
+                            <h4 style={{ marginTop: 0, color: '#8b949e' }}>Cumulative Return</h4>
+                            <img
+                                src={`http://localhost:8000/api/experiments/${id}/image?name=cumulative_return.png`}
+                                alt="Cumulative Return"
+                                style={{ width: '100%', borderRadius: '8px', border: '1px solid #30363d' }}
+                                onError={(e) => { e.target.style.display = 'none'; e.target.parentElement.innerHTML += '<div style="padding:20px; text-align:center; color:#8b949e">Plot not found</div>' }}
+                            />
+                        </div>
+                        <div>
+                            <h4 style={{ marginTop: 0, color: '#8b949e' }}>Excess Return</h4>
+                            <img
+                                src={`http://localhost:8000/api/experiments/${id}/image?name=excess_return.png`}
+                                alt="Excess Return"
+                                style={{ width: '100%', borderRadius: '8px', border: '1px solid #30363d' }}
+                                onError={(e) => { e.target.style.display = 'none'; e.target.parentElement.innerHTML += '<div style="padding:20px; text-align:center; color:#8b949e">Plot not found</div>' }}
+                            />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div className={styles.grid}>
                 {/* Params Card */}
                 <div className={styles.card}>
                     <div className={styles.cardHeader}>

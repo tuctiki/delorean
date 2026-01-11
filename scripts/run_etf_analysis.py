@@ -228,6 +228,15 @@ def main() -> None:
             strategy_params=strategy_params
         )
         exp_manager.save_report(report, positions)
+        
+        # Log Plots as Artifacts (explicitly)
+        # Note: These are saved by ResultAnalyzer into OUTPUT_DIR (artifacts/)
+        # We need to log them to the recorder for MLflow tracking
+        plots = ["cumulative_return.png", "excess_return.png", "factor_ic.png", "feature_correlation.png"]
+        for p in plots:
+             p_path = os.path.join("artifacts", p) # Analyzer saves to artifacts/
+             if os.path.exists(p_path):
+                 recorder.log_artifact(p_path)
 
         # 6. Analysis
 

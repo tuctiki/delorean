@@ -200,6 +200,40 @@ def get_experiment_details(experiment_id: str):
                     
     return details
 
+@app.get("/api/experiments/{experiment_id}/image")
+def get_experiment_image(experiment_id: str, name: str):
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    exp_path = os.path.join(root, "mlruns", experiment_id)
+    
+    if not os.path.exists(exp_path):
+        raise HTTPException(status_code=404, detail="Experiment not found")
+        
+    # Get latest run
+    runs = [d for d in os.listdir(exp_path) if os.path.isdir(os.path.join(exp_path, d)) and len(d) > 20]
+    if not runs:
+        raise HTTPException(status_code=404, detail="No runs found")
+        
+    runs.sort(key=lambda x: os.path.getmtime(os.path.join(exp_path, x)), reverse=True)
+    latest_run = runs[0]
+    
+    # Check standard artifacts location (Qlib/MLflow default)
+    # 1. mlruns/exp/run/artifacts/name
+    # 2. mlruns/exp/run/name (sometimes direct)
+    
+    possible_paths = [
+        os.path.join(exp_path, latest_run, "artifacts", name),
+        os.path.join(exp_path, latest_run, name),
+        # Fallback to project artifacts if it's the very latest run (approximate check)
+        os.path.join(root, "artifacts", name)
+    ]
+    
+    for p in possible_paths:
+        if os.path.exists(p):
+            from fastapi.responses import FileResponse
+            return FileResponse(p)
+            
+    raise HTTPException(status_code=404, detail="Image not found")
+
 @app.get("/api/data/{symbol}")
 def get_data(symbol: str, days: int = 365):
     try:
