@@ -2,6 +2,7 @@ from typing import List, Dict, Any, Union, Optional
 from qlib.data.dataset import DatasetH
 from qlib.data.dataset.handler import DataHandlerLP
 from qlib.data.dataset.processor import CSZScoreNorm, DropnaLabel
+from qlib.contrib.data.handler import Alpha158
 from constants import ETF_LIST, START_TIME, END_TIME, TRAIN_END_TIME, TEST_START_TIME
 
 class ETFDataHandler(DataHandlerLP):
@@ -11,6 +12,32 @@ class ETFDataHandler(DataHandlerLP):
     Inherits from Qlib's DataHandlerLP to manage data loading, processing, and feature generation
     standardized for the ETF strategy.
     """
+    @staticmethod
+    def get_custom_factors():
+        """
+        Returns a tuple of (expressions, names) for the custom ETF factors.
+        """
+        custom_exprs = [
+            "Log(Mean($volume * $close, 20))",                  
+            "$close / Ref($close, 60) - 1",                     
+            "$close / Ref($close, 120) - 1",                    
+            "($close / Ref($close, 5) - 1) * -1",               
+            "Std($close / Ref($close, 1) - 1, 20)",             
+            "Std($close / Ref($close, 1) - 1, 60)",             
+            "Std($close / Ref($close, 1) - 1, 120)",            
+        ]
+        
+        custom_names = [
+            "MarketCap_Liquidity",
+            "MOM60",
+            "MOM120",
+            "REV5",
+            "VOL20",
+            "VOL60",
+            "VOL120",
+        ]
+        return custom_exprs, custom_names
+
     def __init__(self, instruments: List[str], start_time: str, end_time: str, **kwargs: Any):
         """
         Initialize the ETFDataHandler.
@@ -21,16 +48,10 @@ class ETFDataHandler(DataHandlerLP):
             end_time (str): End date string (YYYY-MM-DD).
             **kwargs: Additional arguments passed to DataHandlerLP.
         """
+        custom_exprs, _ = self.get_custom_factors()
+        
         data_loader_config = {
-            "feature": [
-                "Log(Mean($volume * $close, 20))",                  # Market Cap / Liquidity Proxy
-                "$close / Ref($close, 60) - 1",                     # Medium-term Momentum (MOM60)
-                "$close / Ref($close, 120) - 1",                    # Long-term Momentum (MOM120)
-                "($close / Ref($close, 5) - 1) * -1",               # Short-term Reversal (REV5)
-                "Std($close / Ref($close, 1) - 1, 20)",             # 20-day Volatility (VOL20)
-                "Std($close / Ref($close, 1) - 1, 60)",             # 60-day Volatility (VOL60)
-                "Std($close / Ref($close, 1) - 1, 120)",            # Long-term Volatility (Defensive)
-            ],
+            "feature": custom_exprs, # Use the centralized definitions
             "label": [
                 "Ref($close, -1) / $close - 1"  # Next Day Return (Restored)
             ],
@@ -56,13 +77,41 @@ class ETFDataHandler(DataHandlerLP):
             **kwargs
         )
 
+class ETFAlpha158DataHandler(Alpha158):
+    """
+    Custom Alpha158 DataHandler for ETF data.
+    Overrides label to match the strategy's target (Next Day Return).
+    """
+    def get_label_config(self):
+        return ["Ref($close, -1) / $close - 1"]
+
+class ETFHybridDataHandler(Alpha158):
+    """
+    Hybrid DataHandler: Alpha158 + Custom Factors.
+    """
+    def get_label_config(self):
+        return ["Ref($close, -1) / $close - 1"]
+        
+    def get_feature_config(self):
+        # Get Alpha158 features (Tuple of (expressions_list, names_list))
+        conf = super().get_feature_config()
+        alpha158_exprs, alpha158_names = conf
+        
+        # Get Custom Factors from ETFDataHandler
+        custom_exprs, custom_names = ETFDataHandler.get_custom_factors()
+        
+        # Merge
+        return (alpha158_exprs + custom_exprs, alpha158_names + custom_names)
+
 class ETFDataLoader:
     """
     Wrapper class to manage Qlib DatasetH creation and splitting.
     """
-    def __init__(self):
-        self.handler: Optional[ETFDataHandler] = None
+    def __init__(self, use_alpha158: bool = False, use_hybrid: bool = False):
+        self.handler: Union[ETFDataHandler, ETFAlpha158DataHandler, ETFHybridDataHandler, None] = None
         self.dataset: Optional[DatasetH] = None
+        self.use_alpha158 = use_alpha158
+        self.use_hybrid = use_hybrid
 
     def load_data(self) -> DatasetH:
         """
@@ -71,12 +120,27 @@ class ETFDataLoader:
         Returns:
             DatasetH: The configured Qlib dataset object ready for training/inference.
         """
-        print("Initializing ETF DataHandler...")
-        self.handler = ETFDataHandler(
-            instruments=ETF_LIST,
-            start_time=START_TIME,
-            end_time=END_TIME,
-        )
+        if self.use_hybrid:
+            print("Initializing ETF Hybrid DataHandler (Alpha158 + Custom)...")
+            self.handler = ETFHybridDataHandler(
+                instruments=ETF_LIST,
+                start_time=START_TIME,
+                end_time=END_TIME,
+            )
+        elif self.use_alpha158:
+            print("Initializing ETF Alpha158 DataHandler...")
+            self.handler = ETFAlpha158DataHandler(
+                instruments=ETF_LIST,
+                start_time=START_TIME,
+                end_time=END_TIME,
+            )
+        else:
+            print("Initializing Custom ETF DataHandler...")
+            self.handler = ETFDataHandler(
+                instruments=ETF_LIST,
+                start_time=START_TIME,
+                end_time=END_TIME,
+            )
         
         segments = {
             "train": (START_TIME, TRAIN_END_TIME),

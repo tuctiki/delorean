@@ -5,6 +5,8 @@ from data import ETFDataLoader
 from model import ModelTrainer
 from backtest import BacktestEngine
 from analysis import ResultAnalyzer, FactorAnalyzer
+from experiment_manager import ExperimentManager
+from feature_selection import FeatureSelector
 from qlib.workflow import R
 
 def parse_args() -> argparse.Namespace:
@@ -13,6 +15,8 @@ def parse_args() -> argparse.Namespace:
     """
     parser = argparse.ArgumentParser(description="Run ETF Strategy Analysis")
     parser.add_argument("--topk", type=int, default=4, help="Number of stocks to hold in TopK strategy (default: 4)")
+    parser.add_argument("--use_alpha158", action="store_true", help="Use Qlib Alpha158 embedded factors")
+    parser.add_argument("--use_hybrid", action="store_true", help="Use Hybrid Factors (Custom + Alpha158)")
     return parser.parse_args()
 
 def main() -> None:
@@ -25,7 +29,7 @@ def main() -> None:
     qlib.init(provider_uri=QLIB_PROVIDER_URI, region=QLIB_REGION)
 
     # 2. Data Loading
-    data_loader = ETFDataLoader()
+    data_loader = ETFDataLoader(use_alpha158=args.use_alpha158, use_hybrid=args.use_hybrid)
     dataset = data_loader.load_data()
 
     # 3. Factor Analysis
@@ -36,13 +40,46 @@ def main() -> None:
     model_trainer = ModelTrainer()
     
     # Using Recorder for experiment tracking
-    with R.start(experiment_name="ETF_Strategy_Refactored") as recorder:
+    # Using Recorder for experiment tracking
+    if args.use_hybrid:
+        exp_name = "ETF_Strategy_Hybrid"
+    elif args.use_alpha158:
+        exp_name = "ETF_Strategy_Alpha158"
+    else:
+        exp_name = "ETF_Strategy_Refactored"
+        
+    with R.start(experiment_name=exp_name) as recorder:
         model_trainer.train(dataset)
         pred = model_trainer.predict(dataset)
         
         # Feature Importance
         feature_imp = model_trainer.get_feature_importance(dataset)
-        print("\nTop 10 Feature Importance:\n", feature_imp.head(10))
+        print("\nTop 10 Feature Importance (Stage 1):\n", feature_imp.head(10))
+
+        if args.use_alpha158 or args.use_hybrid:
+            print("\n[Optimization] Performing Feature Selection (Top 20) with Correlation Filtering...")
+            
+            # 1. Start with Top 30 important features (to have buffer for filtering)
+            initial_top_k = 40 
+            top_features_initial = feature_imp['feature'].head(initial_top_k).tolist()
+            print(f"Initial Top {initial_top_k} Candidates: {top_features_initial}")
+            
+            # 2. Filter using centralized FeatureSelector
+            top_features = FeatureSelector.filter_by_correlation(dataset, top_features_initial, threshold=0.95)
+            
+            # Ensure we only keep Top 20 from the filtered list (FeatureSelector returns all non-correlated)
+            top_features = top_features[:20]
+            print(f"Final Selected Features ({len(top_features)}): {top_features}")
+            
+            print("Stage 2: Retraining with Selected Features...")
+            model_trainer.train(dataset, selected_features=top_features)
+            
+            # Update predictions with new model
+            pred = model_trainer.predict(dataset)
+            
+            # Re-check importance (Optional)
+            # feature_imp_opt = model_trainer.get_feature_importance(dataset)
+            # print("\nTop 10 Feature Importance (Stage 2):\n", feature_imp_opt.head(10))
 
         # Signal Smoothing
         print("Applying 10-day EWMA Signal Smoothing...")
@@ -96,10 +133,35 @@ def main() -> None:
         
         # 4. Backtest
         backtest_engine = BacktestEngine(pred)
+        
+        # Strategy Parameters
+        strategy_params = {
+            "topk": args.topk,
+            "drop_rate": 0.96,
+            "n_drop": 1,
+            "market_regime": "MA60" # Descriptive for logging
+        }
+        
         # Pass updated robust params AND Market Regime (User Requested)
-        report, positions = backtest_engine.run(topk=args.topk, drop_rate=0.96, n_drop=1, market_regime=market_regime)
+        report, positions = backtest_engine.run(
+            topk=strategy_params["topk"], 
+            drop_rate=strategy_params["drop_rate"], 
+            n_drop=strategy_params["n_drop"], 
+            market_regime=market_regime
+        )
+        
+        # 5. Experiment Logging
+        exp_manager = ExperimentManager()
+        exp_manager.log_config(
+            args=args,
+            model_params=model_trainer.get_params(),
+            strategy_params=strategy_params
+        )
+        exp_manager.save_report(report, positions)
 
-        # 5. Analysis
+        # 6. Analysis
+
+        # 6. Analysis
         analyzer = ResultAnalyzer()
         analyzer.process(report, positions)
 

@@ -6,36 +6,25 @@ This project focuses on utilizing [Qlib](https://github.com/microsoft/qlib), an 
 
 The project relies on a specific Conda environment (`quant`) and leverages `direnv` for automatic environment activation. Refer to the detailed setup instructions in `GEMINI.md` for installing `direnv`, creating the `quant` environment, and setting up Qlib.
 
-**Key Setup Steps (summarized from `GEMINI.md`):**
-1.  **Conda Environment**: Ensure the `quant` conda environment is active.
-2.  **Qlib Installation**: Ensure `pyqlib 0.9.7` is installed. The Qlib source code is available under `./vendors/qlib`.
-
 ## Data Acquisition and Preprocessing Workflow
-
-The workflow involves three main stages to prepare ETF data for Qlib applications:
 
 ### 1. Download ETF Historical Data from AkShare
 
-This step fetches daily historical data for a predefined list of Chinese ETFs using the AkShare library. The `ETF_LIST` is defined in `constants.py`.
+Fetch daily historical data for a predefined list of Chinese ETFs (defined in `constants.py`) using AkShare.
 
 -   **Script**: `download_etf_data_to_csv.py`
--   **Purpose**: Fetches data for ETFs listed in `constants.py`.
--   **Output**: CSV files for each ETF, stored in `~/.qlib/csv_data/akshare_etf_data/`.
+-   **Output**: CSV files in `~/.qlib/csv_data/akshare_etf_data/`.
 
-**To run this step:**
 ```bash
 python download_etf_data_to_csv.py
 ```
 
 ### 2. Convert Data to Qlib Binary Format
 
-After downloading, the CSV data needs to be converted into Qlib's efficient binary format. This conversion process is crucial for optimal performance when working with Qlib.
+Transform CSV data into Qlib's efficient binary format.
 
--   **Tool**: `vendors/qlib/scripts/dump_bin.py` (provided by Qlib)
--   **Purpose**: Transforms the raw CSV data into Qlib's proprietary binary format, organizing it for efficient access.
--   **Output**: Qlib-formatted binary data (features, calendars, instruments) located in `~/.qlib/qlib_data/cn_etf_data`.
+-   **Tool**: `vendors/qlib/scripts/dump_bin.py`
 
-**To run this step:**
 ```bash
 python vendors/qlib/scripts/dump_bin.py dump_all \
 --data_path ~/.qlib/csv_data/akshare_etf_data \
@@ -49,34 +38,53 @@ python vendors/qlib/scripts/dump_bin.py dump_all \
 
 ### 3. Run Strategy Analysis (End-to-End)
 
-The project has been refactored into a modular architecture for better maintainability and scalability. The main entry point `run_etf_analysis.py` orchestrates the entire pipeline:
+The project uses a modular architecture. The main entry point `run_etf_analysis.py` orchestrates the pipeline:
 
--   **`data.py`**: Handles data loading and feature engineering (calculating optimized factors like Volatility, Momentum).
--   **`model.py`**: Manages LightGBM model training and prediction.
--   **`backtest.py`**: Executes the `SimpleTopkStrategy` with turnover control using Qlib's engine.
--   **`analysis.py`**: Calculates metrics (Alpha, Sharpe, Drawdown) and generates visualization plots.
+-   **`data.py`**: Handles data loading and feature engineering. Supports Custom, Alpha158, and Hybrid modes.
+-   **`feature_selection.py`**: Implements correlation-based feature filtering.
+-   **`model.py`**: Manages LightGBM model training (Stage 1 Importance -> Stage 2 Refinement).
+-   **`experiment_manager.py`**: Logs experiments and ensures reproducibility.
 
-**To run the complete analysis:**
+**Basic Usage (Original Custom Strategy):**
 ```bash
 python run_etf_analysis.py --topk 4
 ```
 
-## Strategy Details
-- **Universe**: High-liquidity ETFs (HS300, Sector ETFs, Red Dividend).
-- **Model**: LightGBM (Gradient Boosting).
-- **Horizon**: 1-Day Forward Return.
-- **Signal Smoothing**: Raw scores + 10-day EWMA (preserves magnitude signal).
-- **Execution Strategy**: Top 4 ETFs, 100% reallocation check.
-- **Turnover Control**: 96% Probabilistic Retention + 1 Swap Limit (n_drop=1).
-- **Risk Management**: Mandatory **MA60 Regime Filter** on HS300 (Cash rule).
+**Advanced Usage:**
+-   **Alpha158 Factors**: `python run_etf_analysis.py --use_alpha158 --topk 4`
+-   **Hybrid Model**: `python run_etf_analysis.py --use_hybrid --topk 4`
 
-## Performance (2024-2025 Verification)
-| Metric | Value | Comment |
-| :--- | :--- | :--- |
-| **Annualized Return** | **18.76%** | Beat benchmark (~9%) significantly. |
-| **Sharpe Ratio** | **0.85** | High risk-adjusted return. |
-| **Max Drawdown** | **-16.10%** | Controlled using MA60 Filter. |
-| **Turnover** | ~450% | Moderate/Tactical. |
+## Factor Models & Modes
 
-> [!IMPORTANT]
-> For long-term survival, ALWAYS heed the `BEAR MARKET DETECTED` warning in the daily signals. The MA60 filter turned a potential -51% crash (2023) into a manageable -18% correction.
+The project supports three distinct factor modeling approaches:
+
+1.  **Custom Strategy (Default/Baseline)**:
+    -   Uses a curated set of low-dimensional factors (Momentum, Volatility, Reversal).
+    -   **Pros**: Robust, interpretable, historically best performance on this ETF set.
+    
+2.  **Alpha158 (Qlib Embedded)**:
+    -   Uses Qlib's standard 158 factors (price/volume patterns).
+    -   **Pros**: comprehensive feature coverage.
+    -   **Optimization**: Includes an auto-selection step (Top 20 features) and stricter regularization to prevent overfitting.
+
+3.  **Hybrid Model**:
+    -   Combines Custom Factors + Alpha158.
+    -   Uses **Correlation Filtering** `(threshold=0.95)` to remove redundant signals.
+
+## Performance Comparison (Latest Verification)
+
+| Metric | Original Custom Strategy | Optimized Alpha158 (Top 20) | Hybrid (Custom + Alpha158) |
+| :--- | :--- | :--- | :--- |
+| **Annualized Return** | **8.56%** | 7.67% | 3.96% |
+| **Max Drawdown** | **-12.28%** | -15.03% | -14.19% |
+| **Sharpe Ratio** | **0.77** | 0.57 | 0.35 |
+
+> [!NOTE]
+> The **Original Custom Strategy** remains the recommended baseline due to its superior risk-adjusted returns (Sharpe 0.77).
+
+## Experiment Tracking
+
+Experiments are automatically logged using Qlib's Recorder. 
+-   **Artifacts**: Saved in `mlruns/<exp_id>/<run_id>/`.
+-   **Config**: A full configuration dump is saved as `experiment_config.yaml` for every run.
+-   **Reports**: Backtest reports and analysis plots are saved as artifacts.
