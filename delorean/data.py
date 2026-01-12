@@ -28,6 +28,7 @@ class ETFDataHandler(DataHandlerLP):
             "4 * Std($close, 20) / Mean($close, 20)",      # BB_Width_Norm
             "(3 * Mean(If($high > Ref($close, 1), $high, Ref($close, 1)) - If($low < Ref($close, 1), $low, Ref($close, 1)), 20)) / Mean($close, 20)", # KC_Width_Norm
             "(4 * Std($close, 20)) / (3 * Mean(If($high > Ref($close, 1), $high, Ref($close, 1)) - If($low < Ref($close, 1), $low, Ref($close, 1)), 20))", # Squeeze_Ratio
+
         ]
         
         custom_names = [
@@ -41,6 +42,7 @@ class ETFDataHandler(DataHandlerLP):
             "BB_Width_Norm",
             "KC_Width_Norm",
             "Squeeze_Ratio",
+
         ]
         return custom_exprs, custom_names
 

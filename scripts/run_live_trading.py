@@ -11,6 +11,7 @@ from delorean.data import ETFDataLoader
 from delorean.model import ModelTrainer
 from delorean.backtest import BacktestEngine
 from qlib.contrib.evaluate import risk_analysis
+from qlib.data import D
 
 def get_trading_signal(topk=5):
     """
@@ -166,151 +167,110 @@ def get_trading_signal(topk=5):
     latest_pred = pred_smooth.loc[latest_date]
     latest_pred = latest_pred.sort_values(ascending=False)
     
-    # --- Market Regime Check (Live) ---
-    print("\n[Market Regime Check]")
-    from qlib.data import D
-    from delorean.config import BENCHMARK
+    # --- Market Regime Check (Global HS300) ---
+    print("\n[Market Regime Check] Global HS300 Filter (Price > MA60)...")
+    from delorean.config import BENCHMARK, ETF_LIST, ETF_NAME_MAP
     
-    # Fetch last 300 days of benchmark to be safe
-    # Qlib 'start_time' needs string or pd.Timestamp
-    # Using relative date
-    bench_start_check = latest_date - pd.Timedelta(days=400)
-    bench_df = D.features([BENCHMARK], ['$close'], start_time=bench_start_check, end_time=latest_date)
+    # 1. Fetch Benchmark Data
+    bench_df = D.features([BENCHMARK], ['$close'], start_time=latest_date, end_time=latest_date)
+    bench_close = 0.0
+    bench_ma60 = 0.0
+    is_bull = True
     
     if not bench_df.empty:
-        bench_close = bench_df.droplevel(0)
-        bench_close.columns = ['close']
-        bench_close['ma60'] = bench_close['close'].rolling(window=60).mean()
-        
-        # Latest regime
-        is_bull = True # Default
-        last_close = 0.0
-        last_ma60 = 0.0
-        capacity_factor = 1.0
-        
-        try:
-            last_close = float(bench_close.loc[latest_date, 'close'])
-            last_ma60 = float(bench_close.loc[latest_date, 'ma60'])
-            is_bull = last_close > last_ma60
-            
-            print(f"Benchmark ({BENCHMARK}) Close: {last_close:.2f}")
-            print(f"Benchmark MA60: {last_ma60:.2f}")
-            
-            if not is_bull:
-                capacity_factor = 0.0 # LIQUIDATE ALL
-                print("\n" + "!"*40)
-                print(f"WARNING: BEAR MARKET DETECTED (Price < MA60)")
-                print(f"STRATEGY RECOMMENDATION: LIQUIDATE ALL (CASH)")
-                print("!"*40)
-            else:
-                print("Status: BULL Market (Price > MA60). Capacity: 100%.")
-        except KeyError:
-             print("Warning: Could not calculate MA60 for latest date (Data missing?). Assuming Bull.")
-    else:
-        print("Warning: Benchmark data not found.")
-        is_bull = True
-        capacity_factor = 1.0
-        last_close = 0.0
-        last_ma60 = 0.0
-
+        # Fetch Close and MA60 for Benchmark
+        bench_feat = D.features([BENCHMARK], ['$close', 'Mean($close, 60)'], start_time=latest_date, end_time=latest_date)
+        if not bench_feat.empty:
+             bench_close = bench_feat.iloc[0, 0]
+             bench_ma60 = bench_feat.iloc[0, 1]
+             
+             if bench_close < bench_ma60:
+                 is_bull = False
+                 print(f"  [BEAR DETECTED] HS300 Close ({bench_close:.2f}) < MA60 ({bench_ma60:.2f}). Liquidate All.")
+             else:
+                 print(f"  [BULL CONFIRMED] HS300 Close ({bench_close:.2f}) > MA60 ({bench_ma60:.2f}). Trade On.")
     
     # [NEW] Configuration Artifact
-    # We should match this with how we ran the script, or just hardcode the "Active" settings
-    # Since this script "is" the active strategy, we define what it does.
     strategy_config = {
         "topk": topk,
         "smooth_window": 15,
         "buffer": 2,
         "label_horizon": 5,
-        "mode": "Equal Weight + Dynamic Exposure"
+        "mode": "Equal Weight + Global HS300 Filter"
     }
 
     rec_artifact = {
         "date": latest_date.strftime('%Y-%m-%d'),
         "generation_time": datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-        "market_status": "Bear" if (bench_df.empty or not is_bull) else "Bull",
+        "market_status": "Bull" if is_bull else "Bear",
         "validation": validation_metrics,
         "market_data": {
-            "benchmark_close": last_close,
-            "benchmark_ma60": last_ma60
+            "benchmark_close": float(bench_close),
+            "benchmark_ma60": float(bench_ma60)
         },
         "strategy_config": strategy_config,
         "top_recommendations": [],
-        "buffer_holdings": [], # For ranks within buffer
+        "buffer_holdings": [], 
         "full_rankings": []
     }
+
+    # 2. Populate Recommendations
+    # Fetch Volatility for display
+    fields = [
+        '$close', 
+        'Std($close/Ref($close,1)-1, 20)'
+    ]
+    names = ['close', 'vol20']
     
-    # [NEW] Fetch Volatility AND Close Price for Display
-    print("\n[Data] Fetching Volatility (VOL20) and Close Price for display...")
-    from delorean.config import ETF_LIST
-    # Using $close for price.
-    feat_df = D.features(ETF_LIST, ['$close', 'Std($close/Ref($close,1)-1, 20)'], start_time=latest_date, end_time=latest_date)
-    feat_df.columns = ['close', 'vol20']
+    feat_df = D.features(ETF_LIST, fields, start_time=latest_date, end_time=latest_date)
+    feat_df.columns = names
     
     vol_map = {}
     close_map = {}
     
     if not feat_df.empty:
-        # Reset index to get symbol
-        try:
-             # Droplevel datetime if present
-            if 'datetime' in feat_df.index.names:
-                feat_reset = feat_df.droplevel('datetime')
-            else:
-                feat_reset = feat_df
-            
-            vol_map = feat_reset['vol20'].to_dict()
-            close_map = feat_reset['close'].to_dict()
-            
-            print(f"Loaded Features for {len(vol_map)} instruments.")
-        except Exception as e:
-            print(f"Warning: Failed to parse Feature data: {e}")
-        except Exception as e:
-            print(f"Warning: Failed to parse Volatility data: {e}")
+        # Reset index
+         if 'datetime' in feat_df.index.names:
+             feat_reset = feat_df.droplevel('datetime')
+         else:
+             feat_reset = feat_df
+         vol_map = feat_reset['vol20'].to_dict()
+         close_map = feat_reset['close'].to_dict()
 
-    # Calculate Target Weights (Equal Weight on Top K)
-    # Volatility is fetched for display only.
-         
-    # 2. Populate Recommendations with Weights
-    # We Iterate larger than topk to capture Buffer items too if needed for display
-    # But weights are usually allocated to Top K. Buffer items held have "current weight" but 0 target weight?
-    # Actually strategy says: Buffer held? Keep it. 
-    # For UI simplicity: Show Target Weights for Top K (The "Buy" List).
+    if is_bull:
+        # Bull Market: Top K
+        for i, (symbol, score) in enumerate(latest_pred.head(topk).items(), 1):
+             vol_raw = vol_map.get(symbol, 0.0)
+             close_price = close_map.get(symbol, 0.0)
+             
+             # Weight Calculation
+             weight = 1.0 / topk 
+             
+             item = {
+                "rank": i,
+                "symbol": symbol,
+                "name": ETF_NAME_MAP.get(symbol, symbol),
+                "score": float(score),
+                "volatility": float(vol_raw),
+                "current_price": float(close_price),
+                "target_weight": float(weight),
+                "is_buffer": False
+            }
+             rec_artifact["top_recommendations"].append(item)
+    else:
+        # Bear Market: Empty Recommendations (Hold Cash)
+        pass 
     
-    for i, (symbol, score) in enumerate(latest_pred.head(topk + 2).items(), 1): # Show Top K + Buffer
-        vol_raw = vol_map.get(symbol, 0.0)
-        close_price = close_map.get(symbol, 0.0)
-        
-        # Weight Calculation (Only for Top K) - EQUAL WEIGHT (Default)
-        weight = 0.0
-        if i <= topk:
-            if topk > 0:
-                weight = (1.0 / topk) * capacity_factor
-            else:
-                weight = 0.0
-        
-        item = {
-            "rank": i,
-            "symbol": symbol,
-            "name": ETF_NAME_MAP.get(symbol, symbol),
-            "score": float(score),
-            "volatility": float(vol_raw),
-            "current_price": float(close_price),
-            "target_weight": float(weight),
-            "is_buffer": i > topk
-        }
-        
-        rec_artifact["top_recommendations"].append(item)
-        
-    # Full list (limit to top 50 to avoid huge json if needed, or all)
+    # Full Rankings always populated for reference
     for symbol, score in latest_pred.items():
          vol_raw = vol_map.get(symbol, 0.0)
-         if pd.isna(vol_raw): vol_raw = 0.0
          rec_artifact["full_rankings"].append({
             "symbol": symbol,
             "score": float(score),
             "volatility": float(vol_raw)
         })
+
+
         
     import json
     with open("daily_recommendations.json", "w") as f:

@@ -37,7 +37,7 @@ class SimpleTopkStrategy(BaseSignalStrategy):
                            User terminology: "dropout_rate" ~96% -> 96% chance keep old.
         n_drop (int): Maximum number of stocks to swap per trading step if trading occurs.
     """
-    def __init__(self, topk: int = 4, risk_degree: float = 0.95, drop_rate: float = 0.96, n_drop: int = 1, buffer: int = 2, market_regime: pd.Series = None, vol_feature: pd.Series = None, bench_feature: pd.DataFrame = None, **kwargs: Any):
+    def __init__(self, topk: int = 4, risk_degree: float = 0.95, drop_rate: float = 0.96, n_drop: int = 1, buffer: int = 2, market_regime: pd.Series = None, vol_feature: pd.Series = None, trend_feature: pd.Series = None, **kwargs: Any):
         super().__init__(risk_degree=risk_degree, **kwargs)
         self.topk = topk
         self.drop_rate = drop_rate
@@ -45,7 +45,7 @@ class SimpleTopkStrategy(BaseSignalStrategy):
         self.buffer = buffer
         self.market_regime = market_regime
         self.vol_feature = vol_feature # Index: (datetime, instrument), Value: VOL20
-        self.bench_feature = bench_feature # Index: datetime, Columns: close, ma60
+        self.trend_feature = trend_feature # Index: (datetime, instrument), Value: Price/MA60 Ratio
         self.last_risk_degree = risk_degree # State for Hysteresis
 
     def generate_trade_decision(self, execute_result: Any = None) -> TradeDecisionWO:
@@ -56,8 +56,8 @@ class SimpleTopkStrategy(BaseSignalStrategy):
         trade_step = self.trade_calendar.get_trade_step()
         trade_start_time, trade_end_time = self.trade_calendar.get_step_time(trade_step)
 
-        # 0. Market Regime & Dynamic Exposure (with Hysteresis)
-        current_risk_degree = self.last_risk_degree # Default to last state
+        # 0. Market Regime (Per-Asset Trend Filter)
+        current_risk_degree = self.risk_degree # Fixed risk degree (we filter assets instead)
         
         # If market_regime provided (Boolean Series) - Legacy/Override
         if self.market_regime is not None:
@@ -69,45 +69,6 @@ class SimpleTopkStrategy(BaseSignalStrategy):
              if not is_bull:
                  # Standard Regime Filter: Sell All (Cash)
                  return TradeDecisionWO(self._generate_sell_orders(self.trade_position, pd.Index([]), trade_start_time, trade_end_time), self)
-
-        # [NEW] Dynamic Exposure (Trend Strength) with Hysteresis
-        if self.bench_feature is not None:
-             try:
-                 # Check if we have data for this date
-                 if trade_start_time in self.bench_feature.index:
-                     row = self.bench_feature.loc[trade_start_time]
-                     close = row['close']
-                     ma60 = row['ma60']
-                     
-                     trend_strength = (close - ma60) / ma60
-                     
-                     # Hysteresis Logic
-                     # States: High (0.99), Med (0.80), Off (0.0)
-                     # Transitions with buffers
-                     
-                     if current_risk_degree >= 0.99:
-                         # In High -> Downgrade to Med if < 1%
-                         if trend_strength < 0.01:
-                             current_risk_degree = 0.80
-                     elif current_risk_degree >= 0.80:
-                         # In Med -> Upgrade to High if > 2%
-                         if trend_strength > 0.02:
-                             current_risk_degree = 0.99
-                         # In Med -> Downgrade to Off if < -1% (Buffer below 0)
-                         elif trend_strength < -0.01:
-                             current_risk_degree = 0.0
-                     else:
-                         # In Off -> Upgrade to Med if > 0%
-                         if trend_strength > 0:
-                             current_risk_degree = 0.80
-
-                     # Bear (Below MA60) -> 0% (Cash) - Implicitly handled by transition to Off
-                     if current_risk_degree == 0.0:
-                          self.last_risk_degree = 0.0
-                          return TradeDecisionWO(self._generate_sell_orders(self.trade_position, pd.Index([]), trade_start_time, trade_end_time), self)
-
-             except Exception as e:
-                 pass # Fallback to default
         
         # Update State
         self.last_risk_degree = current_risk_degree
@@ -131,6 +92,43 @@ class SimpleTopkStrategy(BaseSignalStrategy):
             return TradeDecisionWO([], self)
             
         # 3. Determine Target Stocks (Top K)
+        # Filter for Per-Asset Trend
+        valid_candidates = pred_score.index
+        
+        if self.trend_feature is not None:
+            # Get trends for this date
+            try:
+                # trend_feature is (datetime, instrument) -> value
+                # We need to slice current date
+                current_trends = self.trend_feature.loc[trade_start_time]
+                
+                # Identify valid (Bull) stocks: Ratio > 1.0
+                # Assuming index is instrument
+                valid_mask = current_trends > 1.0
+                
+                # Filter candidates
+                # Candidates are in pred_score (instrument)
+                # Join to safely apply mask
+                
+                # Convert pred_score to df to join
+                df_score = pred_score.to_frame('score')
+                df_score['trend'] = current_trends
+                
+                # Default missing trend to 1.0 (Neutral/Bull) or 0.0 (Bear)?
+                # Let's say missing = Bull (pass) to be safe against data gaps, or strictly Bear?
+                # User wants "Liquidate All based on HS300" replacement.
+                # If we don't have data, we assume Bull?
+                df_score['trend'] = df_score['trend'].fillna(1.0)
+                
+                # Filter
+                valid_df = df_score[df_score['trend'] > 1.0]
+                
+                # Re-assign pred_score to filtered only
+                pred_score = valid_df['score']
+                
+            except Exception as e:
+                pass # Proceed with all if error
+
         # We need the full sorted list to find best replacements if needed
         sorted_score = pred_score.sort_values(ascending=False)
         target_stocks = sorted_score.head(self.topk).index
@@ -420,7 +418,7 @@ class BacktestEngine:
         """
         self.pred = pred
 
-    def run(self, topk: int = 3, market_regime: pd.Series = None, start_time=None, end_time=None, **kwargs: Any) -> Tuple[pd.DataFrame, Dict[Any, Any]]:
+    def run(self, topk: int = 3, market_regime: pd.Series = None, start_time=None, end_time=None, use_trend_filter: bool = False, **kwargs: Any) -> Tuple[pd.DataFrame, Dict[Any, Any]]:
         """
         Run the backtest simulation.
 
@@ -429,19 +427,53 @@ class BacktestEngine:
             market_regime (pd.Series): Boolean series (True=Bull, False=Bear) to filter trades.
             start_time (str|pd.Timestamp): Custom start time for backtest. Defaults to config.TEST_START_TIME.
             end_time (str|pd.Timestamp): Custom end time for backtest. Defaults to derived from data.
+            use_trend_filter (bool): Whether to enable the per-asset trend filter (Default: False).
             **kwargs: Additional strategy parameters (drop_rate, n_drop).
 
         Returns:
             Tuple[pd.DataFrame, dict]: A tuple containing the backtest report DataFrame 
             and a dictionary of position details.
         """
-        print(f"\nRunning Backtest (Custom SimpleTopkStrategy, TopK={topk}, RegimeFilter={'On' if market_regime is not None else 'Off'}, Params={kwargs})...")
+
+        print(f"\nRunning Backtest (Custom SimpleTopkStrategy, TopK={topk}, GlobalRegime={'On' if market_regime is not None else 'Off'}, PerAssetTrend={'On' if use_trend_filter else 'Off'}, Params={kwargs})...")
+        # Fetch Trend Feature if needed
+        trend_feature = None
+        if use_trend_filter:
+            # We always try to fetch it for per-asset filtering
+            from qlib.data import D
+            from .config import ETF_LIST
+            # Price/MA60 Ratio
+            # We need to fetch it aligned with pred's range
+            # To be safe, fetch for the whole range of pred
+            
+            # Extract time range from pred index
+            time_idx = self.pred.index.get_level_values('datetime')
+            start_t = time_idx.min()
+            end_t = time_idx.max()
+            
+            try:
+                # Fetch Price_MA60_Ratio
+                # Expression: $close / Mean($close, 60)
+                fields = ['$close / Mean($close, 60)']
+                names = ['ma60_ratio']
+                
+                # We fetch for ALL ETFs in the list, to cover whatever is in pred
+                # Actually pred might contain subset if selection used
+                # But querying ETF_LIST is safer
+                feat_df = D.features(ETF_LIST, fields, start_time=start_t, end_time=end_t)
+                if not feat_df.empty:
+                    # Index is (datetime, instrument)
+                    trend_feature = feat_df.iloc[:, 0] # Series
+            except Exception as e:
+                print(f"Warning: Failed to fetch Trend Feature/Data for backtest: {e}")
+
         # Strategy Config
         STRATEGY_CONFIG = {
             "topk": topk,
             "risk_degree": 0.95,
             "signal": self.pred,
             "market_regime": market_regime,
+            "trend_feature": trend_feature,
             **kwargs # Pass drop_rate and n_drop
         }
 

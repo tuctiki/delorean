@@ -142,8 +142,18 @@ def list_experiments():
                      "timestamp": creation_time
                  })
     # Sort by Timestamp Descending (Reverse Order)
+    # Sort by Timestamp Descending (Reverse Order)
     experiments.sort(key=lambda x: x["timestamp"], reverse=True)
     return experiments
+
+@app.get("/api/experiment_results")
+def get_experiment_results():
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    path = os.path.join(root, "artifacts", "experiment_results.json")
+    if os.path.exists(path):
+        with open(path, "r") as f:
+            return json.load(f)
+    return {}
 
 @app.get("/api/experiments/{experiment_id}")
 def get_experiment_details(experiment_id: str):

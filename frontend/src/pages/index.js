@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import useSWR from 'swr';
 import { Play, Activity, TrendingUp, AlertTriangle, RefreshCw, ShieldCheck } from 'lucide-react';
+import Link from 'next/link';
 import Layout from '../components/Layout';
 import AllocationChart from '../components/AllocationChart';
 import styles from '../styles/Home.module.css';
@@ -54,8 +55,16 @@ export default function Home() {
 
     <>
       <div className={styles.grid}>
-        <div style={{ gridColumn: '1 / -1', marginBottom: '10px' }}>
+        <div style={{ gridColumn: '1 / -1', marginBottom: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h1 className={styles.title}>Dashboard</h1>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <Link
+              href="/experiments/filtered_performance"
+              style={{ color: '#8b949e', textDecoration: 'none', border: '1px solid #30363d', padding: '4px 8px', borderRadius: '6px', fontSize: '0.9rem' }}
+            >
+              Experiments
+            </Link>
+          </div>
         </div>
 
 
