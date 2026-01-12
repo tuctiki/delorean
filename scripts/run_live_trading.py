@@ -142,14 +142,14 @@ def get_trading_signal(topk=5):
     pred_prod = model_prod.predict(dataset_prod)
     
     # Signal Smoothing (EWMA)
-    print("  > Applying 20-day EWMA Smoothing...")
+    print("  > Applying 15-day EWMA Smoothing...")
     if pred_prod.index.names[1] == 'instrument':
         level_name = 'instrument'
     else:
         level_name = pred_prod.index.names[1]
         
     pred_smooth = pred_prod.groupby(level=level_name).apply(
-        lambda x: x.ewm(halflife=20, min_periods=1).mean()
+        lambda x: x.ewm(halflife=15, min_periods=1).mean()
     )
     
     # Clean Index
@@ -186,6 +186,7 @@ def get_trading_signal(topk=5):
         is_bull = True # Default
         last_close = 0.0
         last_ma60 = 0.0
+        capacity_factor = 1.0
         
         try:
             last_close = float(bench_close.loc[latest_date, 'close'])
@@ -196,17 +197,19 @@ def get_trading_signal(topk=5):
             print(f"Benchmark MA60: {last_ma60:.2f}")
             
             if not is_bull:
+                capacity_factor = 0.0 # LIQUIDATE ALL
                 print("\n" + "!"*40)
-                print("WARNING: BEAR MARKET DETECTED (Price < MA60)")
-                print("STRATEGY RECOMMENDATION: LIQUIDATE ALL (CASH)")
+                print(f"WARNING: BEAR MARKET DETECTED (Price < MA60)")
+                print(f"STRATEGY RECOMMENDATION: LIQUIDATE ALL (CASH)")
                 print("!"*40)
             else:
-                print("Status: BULL Market (Price > MA60). Trading Active.")
+                print("Status: BULL Market (Price > MA60). Capacity: 100%.")
         except KeyError:
              print("Warning: Could not calculate MA60 for latest date (Data missing?). Assuming Bull.")
     else:
         print("Warning: Benchmark data not found.")
         is_bull = True
+        capacity_factor = 1.0
         last_close = 0.0
         last_ma60 = 0.0
 
@@ -216,7 +219,7 @@ def get_trading_signal(topk=5):
     # Since this script "is" the active strategy, we define what it does.
     strategy_config = {
         "topk": topk,
-        "smooth_window": 20,
+        "smooth_window": 15,
         "buffer": 2,
         "label_horizon": 5,
         "mode": "Equal Weight + Dynamic Exposure"
@@ -239,8 +242,9 @@ def get_trading_signal(topk=5):
     
     # [NEW] Fetch Volatility AND Close Price for Display
     print("\n[Data] Fetching Volatility (VOL20) and Close Price for display...")
+    from delorean.config import ETF_LIST
     # Using $close for price.
-    feat_df = D.features(D.instruments(market=QLIB_REGION), ['$close', 'Std($close/Ref($close,1)-1, 20)'], start_time=latest_date, end_time=latest_date)
+    feat_df = D.features(ETF_LIST, ['$close', 'Std($close/Ref($close,1)-1, 20)'], start_time=latest_date, end_time=latest_date)
     feat_df.columns = ['close', 'vol20']
     
     vol_map = {}
@@ -280,7 +284,10 @@ def get_trading_signal(topk=5):
         # Weight Calculation (Only for Top K) - EQUAL WEIGHT (Default)
         weight = 0.0
         if i <= topk:
-             weight = 1.0 / topk
+            if topk > 0:
+                weight = (1.0 / topk) * capacity_factor
+            else:
+                weight = 0.0
         
         item = {
             "rank": i,

@@ -67,7 +67,7 @@ class SimpleTopkStrategy(BaseSignalStrategy):
                 is_bull = True
              
              if not is_bull:
-                 # Standard Regime Filter: Sell All
+                 # Standard Regime Filter: Sell All (Cash)
                  return TradeDecisionWO(self._generate_sell_orders(self.trade_position, pd.Index([]), trade_start_time, trade_end_time), self)
 
         # [NEW] Dynamic Exposure (Trend Strength) with Hysteresis
