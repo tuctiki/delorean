@@ -420,13 +420,15 @@ class BacktestEngine:
         """
         self.pred = pred
 
-    def run(self, topk: int = 3, market_regime: pd.Series = None, **kwargs: Any) -> Tuple[pd.DataFrame, Dict[Any, Any]]:
+    def run(self, topk: int = 3, market_regime: pd.Series = None, start_time=None, end_time=None, **kwargs: Any) -> Tuple[pd.DataFrame, Dict[Any, Any]]:
         """
         Run the backtest simulation.
 
         Args:
             topk (int): Number of stocks to hold in the TopK strategy.
             market_regime (pd.Series): Boolean series (True=Bull, False=Bear) to filter trades.
+            start_time (str|pd.Timestamp): Custom start time for backtest. Defaults to config.TEST_START_TIME.
+            end_time (str|pd.Timestamp): Custom end time for backtest. Defaults to derived from data.
             **kwargs: Additional strategy parameters (drop_rate, n_drop).
 
         Returns:
@@ -463,24 +465,23 @@ class BacktestEngine:
         strategy_obj = SimpleTopkStrategy(**STRATEGY_CONFIG)
         executor_obj = qlib_executor.SimulatorExecutor(**EXECUTOR_CONFIG["kwargs"])
 
-        # Determine Backtest End Time
-        # The backtest engine's calendar logic requires the 'next' step to exist to define the interval.
-        # If we run until the absolute last available date, get_step_time(i) tries to access i+1.
-        # So we must stop one step before the end of the data/calendar.
+        # Determine Backtest Time Range
+        if start_time is None:
+            start_time = TEST_START_TIME
         
-        valid_dates = self.pred.index.get_level_values('datetime').unique().sort_values()
-        if len(valid_dates) > 1:
-            # Use the second to last date as the safe end_time for simulation
-            # This ensures 'next day' exists in the calendar (which is the last date)
-            data_end_time = valid_dates[-2]
-        else:
-            data_end_time = valid_dates[-1]
+        if end_time is None:
+            # The backtest engine's calendar logic requires the 'next' step to exist to define the interval.
+            valid_dates = self.pred.index.get_level_values('datetime').unique().sort_values()
+            if len(valid_dates) > 1:
+                end_time = valid_dates[-2]
+            else:
+                end_time = valid_dates[-1]
 
         portfolio_metric_dict, indicator_dict = qlib_backtest(
             executor=executor_obj,
             strategy=strategy_obj,
-            start_time=TEST_START_TIME,
-            end_time=data_end_time,
+            start_time=start_time,
+            end_time=end_time,
             account=1000000,
             benchmark=BENCHMARK,
         )
