@@ -82,8 +82,20 @@ python scripts/run_etf_analysis.py \
 ## Implementation Details
 
 ### Factor Models
--   **Custom Strategy**: Momentum + Volatility + Reversal factors. (Best risk-adjusted return).
--   **Optimization**: Uses **Cross-Sectional Z-Score** Feature Neutralization and **5-Day Forward Return** Label.
+The strategy utilizes a **Custom Hybrid Factor Model** composed of 7 robust factors optimized for the Chinese ETF market:
+
+1.  **MarketCap_Liquidity**: `Log(Mean($volume * $close, 20))` - Captures flow and capacity.
+2.  **MOM60**: `$close / Ref($close, 60) - 1` - Medium-term Momentum.
+3.  **MOM120**: `$close / Ref($close, 120) - 1` - Long-term Momentum.
+4.  **REV5**: `($close / Ref($close, 5) - 1) * -1` - Short-term Mean Reversion.
+5.  **VOL20**: `Std($close / Ref($close, 1) - 1, 20)` - Short-term Volatility.
+6.  **VOL60**: `Std($close / Ref($close, 1) - 1, 60)` - Medium-term Volatility.
+7.  **VOL120**: `Std($close / Ref($close, 1) - 1, 120)` - Long-term Volatility.
+
+**Optimization Technique**:
+-   **Preprocessing**: Cross-Sectional Z-Score Feature Neutralization.
+-   **Labeling**: **5-Day Forward Return** (`Ref($close, -5) / $close - 1`).
+-   **Modeling**: LightGBM Regressor.
 
 ### Position Control
 The strategy now supports advanced position sizing:
@@ -106,7 +118,7 @@ All runs are logged to `mlruns/`, viewable via the Dashboard.
 
 ## Frontend Features
 -   **Experiment Visuals**: Detailed performance plots and generation timestamps.
--   **Bear Market Alert**: Visual warning when Benchmark Close < MA60.
+-   **Bear Market Alert**: Visual warning and "LIQUIDATE" recommendation when **Benchmark (510300.SH) Close < 60-Day Moving Average**.
 
 ## Live Trading & Data Periods
 
@@ -118,8 +130,9 @@ The live trading engine receives constant updates to ensure the highest fidelity
 | **Phase 1** | **Validation** (Metrics Check) | Start (`2015`) $\to$ **60 Days Ago** | **60 Days Ago** $\to$ **Today** |
 | **Phase 2** | **Production** (Signal Gen) | Start (`2015`) $\to$ **Yesterday** | **Today** (Generation) |
 
-- **Phase 1 Validation**: Calculates honest "Out-of-Sample" IC and Sharpe metrics by holding out the last 60 days. This prevents overconfidence from "in-sample" validation.
+- **Phase 1 Validation**: Calculates honest "Out-of-Sample" Rank IC and Sharpe metrics by holding out the last **60 days** from training. This prevents overconfidence from "in-sample" validation.
 - **Phase 2 Production**: Retrains the model on *all* available history to generate the optimal signal for tomorrow.
+- **Regime Filter**: The system checks the Benchmark (510300.SH). If **Price < MA60**, it triggers a **Bear Market Warning** and recommends holding **CASH** (Liquidate All).
 
 ### 2. Data Period Breakdown
 Understanding the data split is crucial for replicating results:
