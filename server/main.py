@@ -134,9 +134,21 @@ def list_experiments():
                  creation_time = os.path.getmtime(full_path)
                  creation_str = pd.Timestamp(creation_time, unit='s').strftime('%Y-%m-%d %H:%M:%S')
                  
+                 # [NEW] Try to read meta.yaml for real name
+                 exp_name = f"Experiment {d}"
+                 meta_path = os.path.join(full_path, "meta.yaml")
+                 if os.path.exists(meta_path):
+                     try:
+                         with open(meta_path, "r") as f:
+                             for line in f:
+                                 if line.strip().startswith("name:"):
+                                     exp_name = line.split(":", 1)[1].strip()
+                                     break
+                     except: pass
+                 
                  experiments.append({
                      "id": d, 
-                     "name": f"Experiment {d}", 
+                     "name": exp_name, 
                      "artifact_location": full_path,
                      "creation_time": creation_str,
                      "timestamp": creation_time
@@ -233,8 +245,8 @@ def get_experiment_image(experiment_id: str, name: str):
     possible_paths = [
         os.path.join(exp_path, latest_run, "artifacts", name),
         os.path.join(exp_path, latest_run, name),
-        # Fallback to project artifacts if it's the very latest run (approximate check)
-        os.path.join(root, "artifacts", name)
+        # [REMOVED] Fallback to project artifacts is dangerous as it causes identical plots across experiments
+        # os.path.join(root, "artifacts", name)
     ]
     
     for p in possible_paths:
@@ -283,6 +295,30 @@ def search_etfs():
     # Return ETF List
     from delorean.config import ETF_LIST
     return ETF_LIST
+
+@app.get("/api/config")
+def get_config():
+    """Expose current system configuration."""
+    from delorean.config import MODEL_PARAMS_STAGE1, MODEL_PARAMS_STAGE2, ETF_LIST, START_TIME, END_TIME
+    from delorean.data import ETFDataHandler
+    
+    custom_exprs, custom_names = ETFDataHandler.get_custom_factors()
+    
+    return {
+        "model_params": {
+            "stage1": MODEL_PARAMS_STAGE1,
+            "stage2": MODEL_PARAMS_STAGE2
+        },
+        "data_factors": {
+            "names": custom_names,
+            "expressions": custom_exprs
+        },
+        "universe": ETF_LIST,
+        "time_range": {
+            "start": START_TIME,
+            "end": END_TIME
+        }
+    }
 
 if __name__ == "__main__":
     import uvicorn

@@ -12,6 +12,8 @@ from delorean.model import ModelTrainer
 from delorean.backtest import BacktestEngine
 from qlib.contrib.evaluate import risk_analysis
 from qlib.data import D
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
 
 def get_trading_signal(topk=5):
     """
@@ -108,9 +110,43 @@ def get_trading_signal(topk=5):
                  validation_metrics["sharpe_status"] = "Warning"
              else:
                  validation_metrics["sharpe_status"] = "Pass"
+
+             # [NEW] Generate Plot for Validation
+             cum_ret = (1 + report_val["return"]).cumprod()
+             plt.figure(figsize=(10, 5))
+             plt.plot(cum_ret.index, cum_ret.values, label="Strategy", color="#58a6ff")
+             plt.title(f"Validation Performance ({val_test_start} - Present)")
+             plt.grid(True, linestyle="--", alpha=0.3)
+             plt.legend()
+             
+             plot_path = "artifacts/validation_plot.png"
+             plt.savefig(plot_path)
+             plt.close()
+
         except Exception as e:
             print(f"    Warning: Sharpe calc failed: {e}")
             validation_metrics["sharpe_status"] = "Error"
+            plot_path = None
+
+        # [NEW] Log to Qlib/MLflow
+        # Ensure no active run exists
+        import mlflow
+        if mlflow.active_run():
+            mlflow.end_run()
+            
+        # We start an experiment run here to persist these metrics
+        with R.start(experiment_name="daily_validation"):
+            R.log_params(**model_val.get_params())
+            R.log_metrics(
+                rank_ic=validation_metrics["rank_ic"],
+                sharpe=validation_metrics["sharpe"]
+            )
+            if plot_path and os.path.exists(plot_path):
+                 R.log_artifact(plot_path, "cumulative_return.png") # Rename to standard name expected by UI
+            
+            # R.save_objects(model=model_val.model) # Optional: Save model
+            print("    [MLflow] Metrics logged to experiment 'daily_validation'.")
+
     else:
         print("    Warning: No validation data available.")
 

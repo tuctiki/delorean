@@ -59,10 +59,10 @@ export default function Home() {
           <h1 className={styles.title}>Dashboard</h1>
           <div style={{ display: 'flex', gap: '10px' }}>
             <Link
-              href="/experiments/filtered_performance"
+              href="/experiments/config"
               style={{ color: '#8b949e', textDecoration: 'none', border: '1px solid #30363d', padding: '4px 8px', borderRadius: '6px', fontSize: '0.9rem' }}
             >
-              Experiments
+              Config & Experiments
             </Link>
           </div>
         </div>

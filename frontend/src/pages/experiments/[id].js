@@ -33,7 +33,7 @@ export default function ExperimentDetail() {
                         <div>
                             <h4 style={{ marginTop: 0, color: '#8b949e' }}>Cumulative Return</h4>
                             <img
-                                src={`http://localhost:8000/api/experiments/${id}/image?name=cumulative_return.png`}
+                                src={`http://localhost:8000/api/experiments/${id}/image?name=cumulative_return.png&t=${Date.now()}`}
                                 alt="Cumulative Return"
                                 style={{ width: '100%', borderRadius: '8px', border: '1px solid #30363d' }}
                                 onError={(e) => { e.target.style.display = 'none'; e.target.parentElement.innerHTML += '<div style="padding:20px; text-align:center; color:#8b949e">Plot not found</div>' }}
@@ -42,7 +42,7 @@ export default function ExperimentDetail() {
                         <div>
                             <h4 style={{ marginTop: 0, color: '#8b949e' }}>Excess Return</h4>
                             <img
-                                src={`http://localhost:8000/api/experiments/${id}/image?name=excess_return.png`}
+                                src={`http://localhost:8000/api/experiments/${id}/image?name=excess_return.png&t=${Date.now()}`}
                                 alt="Excess Return"
                                 style={{ width: '100%', borderRadius: '8px', border: '1px solid #30363d' }}
                                 onError={(e) => { e.target.style.display = 'none'; e.target.parentElement.innerHTML += '<div style="padding:20px; text-align:center; color:#8b949e">Plot not found</div>' }}
