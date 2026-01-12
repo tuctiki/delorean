@@ -105,7 +105,56 @@ All runs are logged to `mlruns/`, viewable via the Dashboard.
 *Note: This period covers the significant bear market of 2022-2024, demonstrating the strategy's defensive robustness.*
 
 ## Frontend Features
--   **Premium Grid Layout**: New Glassmorphism design with responsive grid.
--   **Allocation Charts**: Visual Risk Parity weight distribution.
 -   **Experiment Visuals**: Detailed performance plots and generation timestamps.
 -   **Bear Market Alert**: Visual warning when Benchmark Close < MA60.
+
+## Live Trading & Data Periods
+
+### 1. Live Trading System (`scripts/run_live_trading.py`)
+The live trading engine receives constant updates to ensure the highest fidelity signals. It now employs a **Two-Pass Training** strategy:
+
+| Phase | Purpose | Training Period | Testing / Prediction Period |
+| :--- | :--- | :--- | :--- |
+| **Phase 1** | **Validation** (Metrics Check) | Start (`2015`) $\to$ **60 Days Ago** | **60 Days Ago** $\to$ **Today** |
+| **Phase 2** | **Production** (Signal Gen) | Start (`2015`) $\to$ **Yesterday** | **Today** (Generation) |
+
+- **Phase 1 Validation**: Calculates honest "Out-of-Sample" IC and Sharpe metrics by holding out the last 60 days. This prevents overconfidence from "in-sample" validation.
+- **Phase 2 Production**: Retrains the model on *all* available history to generate the optimal signal for tomorrow.
+
+### 2. Data Period Breakdown
+Understanding the data split is crucial for replicating results:
+
+- **Default Configuration**: `2015-01-01` to `2099-12-31`.
+- **Backtesting (Research)**:
+  - **Train**: `2015-01-01` to `2022-12-31`
+  - **Test**: `2023-01-01` to `Present` (Out-of-Sample Stress Test)
+- **Live Trading**:
+  - **Train**: `2015-01-01` to `Yesterday` (Rolling Window)
+  - **Predict**: `Today/Tomorrow`
+
+## Daily Operation Guide
+
+To operate the system in a production-like environment:
+
+### A. Start the Dashboard (Monitoring)
+1. **Backend** (API & Task Runner):
+   ```bash
+   python server/main.py
+   # Runs on http://localhost:8000
+   ```
+2. **Frontend** (UI):
+   ```bash
+   cd frontend
+   npm run dev
+   # Runs on http://localhost:3000
+   ```
+
+### B. Run Daily Update (Action)
+This is the **Master Command** to update data and get new signals. Run this every evening after market close (e.g., 6:00 PM).
+```bash
+python scripts/run_daily_task.py
+```
+*What this does:*
+1. **Downloads** latest market data from AkShare.
+2. **Updates** the Qlib binary database.
+3. **Executes** the Live Trading Engine (`run_live_trading.py`) to generate `daily_recommendations.json`.

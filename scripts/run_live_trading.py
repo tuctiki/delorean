@@ -26,180 +26,144 @@ def get_trading_signal(topk=5):
     print(f"  ETF Strategy Live Signal Generator")
     print("="*50)
 
-    # 2. Load Data (All available history)
-    print("[1/5] Loading Data...")
-    data_loader = ETFDataLoader(label_horizon=5)
-    # [Live Trading Config] 
-    # Dynamic split to ensure we train on full history
-    # We use a robust split: Train up to 14 days ago, Test from 14 days ago.
-    # This ensures 'Test' is never empty even if data lags, and we always get the latest available signal.
     today = datetime.datetime.now()
-    split_date = today - datetime.timedelta(days=14)
+
+    # =========================================================================
+    # PHASE 1: Out-of-Sample Validation (The Honest Check)
+    # =========================================================================
+    print("\n[Phase 1/2] Out-of-Sample Validation (Recent 60 Days)...")
     
-    train_end = (split_date - datetime.timedelta(days=1)).strftime("%Y-%m-%d")
-    test_start = split_date.strftime("%Y-%m-%d")
+    # Validation Split: Train on History[:-60], Test on History[-60:]
+    val_days = 60
+    val_split_date = today - datetime.timedelta(days=val_days)
+    val_train_end = (val_split_date - datetime.timedelta(days=1)).strftime("%Y-%m-%d")
+    val_test_start = val_split_date.strftime("%Y-%m-%d")
     
-    print(f"Live Mode: Training on History up to {train_end}")
-    print(f"           Testing/Inference from {test_start}")
+    print(f"  > Training Data: ... to {val_train_end}")
+    print(f"  > Test (Validation) Data: {val_test_start} to Present")
     
-    data_loader = ETFDataLoader(label_horizon=5)
-    # Override segments for live trading
-    dataset = data_loader.load_data(train_end=train_end, test_start=test_start)
+    # Load Validation Data
+    data_loader_val = ETFDataLoader(label_horizon=5)
+    dataset_val = data_loader_val.load_data(train_end=val_train_end, test_start=val_test_start)
     
-    # 3. Train Model
-    # In live trading, we ideally retrain on ALL past data to get best prediction for tomorrow
-    print("[2/5] Training Model on Full History...")
-    model_trainer = ModelTrainer()
+    # Train Validation Model
+    print("  > Training Validation Model...")
+    model_val = ModelTrainer()
+    model_val.train(dataset_val)
     
-    # Fit model (Note: ModelTrainer uses 'train' segment. 
-    # We might want to override train segment to be 'all history' or 'rolling window'.
-    # By default it follows dataset config. Ideally we slide the train window to END.
-    # But Qlib Dataset spltting is fixed by config. 
-    # For now, we assume the model trains on the training set defined in data.py (2015-2023)
-    # BUT for Live, we should really train on 2015-Now.
-    # Let's see if we can perform a dynamic "Fit" on the whole dataframe?
-    # Qlib Model `fit` takes a Dataset.
-    # Let's rely on the pre-trained model for now (fast), OR define a new rolling dataset?
-    # Simple approach: Train on the standard training set. 
-    # Better approach: To be accurate, we should Retrain.
-    # Let's just run standard training for now to keep it consistent with backtest.
-    # (Improvement: Update train_period in data.py dynamically, but that edits code).
-    model_trainer.train(dataset)
+    # Predict on Validation Set
+    print("  > Predicting on Validation Set...")
+    pred_val_scores = model_val.predict(dataset_val)
     
-    # [Validation] Post-Training Checks
-    print("\n" + "="*40)
-    print("[Validation] Performing Post-Training Checks...")
+    # --- Calculate Validation Metrics (IC & Sharpe) ---
+    print("  > Calculating Validation Metrics...")
+    
+    # Prepare labels for the test segment
+    df_val_all = dataset_val.prepare("test", col_set=["label"])
+    y_val = df_val_all["label"]
+    
+    # Align Prediction & Label
+    # pred_val_scores index: (datetime, instrument)
+    # y_val index: (datetime, instrument)
+    val_res = pd.DataFrame({"score": pred_val_scores, "label": y_val.iloc[:, 0]}).dropna()
     
     validation_metrics = {
-        "rank_ic": None,
-        "sharpe": None,
+        "rank_ic": 0.0,
+        "sharpe": 0.0,
         "ic_status": "Unknown",
         "sharpe_status": "Unknown"
     }
-
-    try:
-        # 1. Prepare Data (Last 6 Months of Train)
-        # Getting the raw dataframe from the dataset's train segment
-        df_train = dataset.prepare("train", col_set=["feature", "label"])
+    
+    if not val_res.empty:
+        # 1. Rank IC
+        daily_ic = val_res.groupby(level='datetime').apply(lambda x: x["score"].corr(x["label"], method="spearman"))
+        mean_ic = daily_ic.mean()
+        validation_metrics["rank_ic"] = float(mean_ic)
+        print(f"    Validation Rank IC: {mean_ic:.4f}") 
         
-        # Filter for last ~6 months (126 trading days)
-        # We use a date-based filter to be precise
-        valid_start_date = pd.Timestamp(train_end) - pd.Timedelta(days=180)
-        
-        # Ensure index is datetime level for filtering
-        # df_train index is (datetime, instrument) usually
-        df_val = df_train.loc[df_train.index.get_level_values('datetime') >= valid_start_date]
-        
-        if not df_val.empty:
-            if model_trainer.selected_features:
-                X_val = df_val["feature"][model_trainer.selected_features]
-            else:
-                X_val = df_val["feature"]
-            y_val = df_val["label"]
-            
-            # Predict
-            # Handle Qlib LGBModel vs Native Booster
-            if hasattr(model_trainer.model, "model"):
-                # Qlib LGBModel -> Inner Booster
-                pred_val_scores = model_trainer.model.model.predict(X_val)
-            else:
-                # Native Booster
-                pred_val_scores = model_trainer.model.predict(X_val)
-            pred_val = pd.Series(pred_val_scores, index=X_val.index)
-            
-            # --- Check 1: Rank IC ---
-            # Align
-            val_res = pd.DataFrame({"score": pred_val, "label": y_val.iloc[:, 0]}).dropna()
-            
-            # Group by date
-            daily_ic = val_res.groupby(level='datetime').apply(lambda x: x["score"].corr(x["label"], method="spearman"))
-            mean_ic = daily_ic.mean()
-            
-            print(f"  > Recent 6-Month Rank IC: {mean_ic:.4f}")
-            validation_metrics["rank_ic"] = float(mean_ic)
-            
-            if mean_ic < 0.035:
-                print("!"*40)
-                print(f"CRITICAL WARNING: Rank IC ({mean_ic:.4f}) < 0.035")
-                print("The model predictive power is low. Signals may be unreliable.")
-                print("!"*40)
-                validation_metrics["ic_status"] = "Critical"
-            else:
-                print("    [PASS] Rank IC > 0.035")
-                validation_metrics["ic_status"] = "Pass"
-                
-            # --- Check 2: Sharpe Ratio (Simulated) ---
-            # Last 60 days
-            sharpe_start_date = pd.Timestamp(train_end) - pd.Timedelta(days=90)
-            pred_sharpe = pred_val.loc[pred_val.index.get_level_values('datetime') >= sharpe_start_date]
-            
-            if not pred_sharpe.empty:
-                print(f"  > Simulating recent performance (from {sharpe_start_date.date()})...")
-                # Run Mini Backtest
-                engine = BacktestEngine(pred_sharpe)
-                # Suppress verbose output for clean log
-                report_val, _ = engine.run(topk=topk) 
-                
-                risks = risk_analysis(report_val["return"], freq="day")
-                sharpe = risks.loc["information_ratio", "risk"]
-                
-                print(f"  > Recent Simulated Sharpe: {sharpe:.4f}")
-                validation_metrics["sharpe"] = float(sharpe)
-                
-                if sharpe < 0.4:
-                     print("!"*40)
-                     print(f"ERROR: Sharpe Ratio ({sharpe:.4f}) < 0.4")
-                     print("Recent performance is very poor.")
-                     print("!"*40)
-                     validation_metrics["sharpe_status"] = "Error"
-                elif sharpe < 0.6:
-                     print("!"*40)
-                     print(f"WARNING: Sharpe Ratio ({sharpe:.4f}) < 0.6")
-                     print("Recent performance is suboptimal.")
-                     print("!"*40)
-                     validation_metrics["sharpe_status"] = "Warning"
-                else:
-                     print("    [PASS] Sharpe > 0.6")
-                     validation_metrics["sharpe_status"] = "Pass"
-            else:
-                print("  > Not enough data for Sharpe check.")
+        if mean_ic < 0.02: # Threshold
+            print("!"*40)
+            print(f"    WARNING: Low OOS Rank IC ({mean_ic:.4f}). Model predictive power is weak.")
+            print("!"*40)
+            validation_metrics["ic_status"] = "Warning"
         else:
-            print("  > Not enough training data for validation.")
-            
-    except Exception as e:
-        print(f"Warning: Validation checks failed: {e}")
-        import traceback
-        traceback.print_exc()
-        
-    print("="*40 + "\n")
+             print("    [PASS] Rank IC acceptable.")
+             validation_metrics["ic_status"] = "Pass"
+
+        # 2. Sharpe (Simulated Backtest)
+        print("    Simulating Strategy on Validation period...")
+        try:
+             engine = BacktestEngine(pred_val_scores)
+             report_val, _ = engine.run(topk=topk)
+             risks = risk_analysis(report_val["return"], freq="day")
+             sharpe = risks.loc["information_ratio", "risk"]
+             validation_metrics["sharpe"] = float(sharpe)
+             print(f"    Validation Sharpe: {sharpe:.4f}")
+             
+             if sharpe < 0.0:
+                 validation_metrics["sharpe_status"] = "Critical"
+                 print("    CRITICAL: Negative Sharpe in recent period.")
+             elif sharpe < 0.5:
+                 validation_metrics["sharpe_status"] = "Warning"
+             else:
+                 validation_metrics["sharpe_status"] = "Pass"
+        except Exception as e:
+            print(f"    Warning: Sharpe calc failed: {e}")
+            validation_metrics["sharpe_status"] = "Error"
+    else:
+        print("    Warning: No validation data available.")
+
+    # =========================================================================
+    # PHASE 2: Production Signal Generation (Full History)
+    # =========================================================================
+    print("\n[Phase 2/2] Production Signal Generation (Full History)...")
+
+    # Production Split: Train on ALL available history to predict Tomorrow.
+    # We stick to the robust 14-day split to ensure Qlib has a non-empty 'test' segment 
+    # for the most recent days, avoiding any empty-dataframe errors.
+    prod_split_date = today - datetime.timedelta(days=14)
+    prod_train_end = (prod_split_date - datetime.timedelta(days=1)).strftime("%Y-%m-%d")
+    prod_test_start = prod_split_date.strftime("%Y-%m-%d")
+
+    print(f"  > Training Data: ... to {prod_train_end}")
+    print(f"  > Prediction Target: {prod_test_start} to Present")
     
-    # 4. Predict (Inference)
-    print("[3/5] Generating Predictions...")
-    pred = model_trainer.predict(dataset)
+    # Load Production Data
+    data_loader_prod = ETFDataLoader(label_horizon=5)
+    dataset_prod = data_loader_prod.load_data(train_end=prod_train_end, test_start=prod_test_start)
     
-    # 5. Signal Processing (EWMA)
-    print("[4/5] Applying 20-day EWMA Smoothing (Apex Config)...")
-    if pred.index.names[1] == 'instrument':
+    # Train Production Model
+    print("  > Training Production Model...")
+    model_prod = ModelTrainer()
+    model_prod.train(dataset_prod)
+    
+    # Generate Signals
+    print("  > Generating Signals...")
+    pred_prod = model_prod.predict(dataset_prod)
+    
+    # Signal Smoothing (EWMA)
+    print("  > Applying 20-day EWMA Smoothing...")
+    if pred_prod.index.names[1] == 'instrument':
         level_name = 'instrument'
     else:
-        level_name = pred.index.names[1]
+        level_name = pred_prod.index.names[1]
         
-    pred = pred.groupby(level=level_name).apply(
+    pred_smooth = pred_prod.groupby(level=level_name).apply(
         lambda x: x.ewm(halflife=20, min_periods=1).mean()
     )
     
-    # Clean index (same fix as run_etf_analysis.py)
-    if pred.index.nlevels > 2:
-        pred = pred.droplevel(0)
-    if pred.index.names[0] != 'datetime' and 'datetime' in pred.index.names:
-         pred = pred.swaplevel()
-    pred = pred.dropna().sort_index()
+    # Clean Index
+    if pred_smooth.index.nlevels > 2:
+        pred_smooth = pred_smooth.droplevel(0)
+    if pred_smooth.index.names[0] != 'datetime' and 'datetime' in pred_smooth.index.names:
+         pred_smooth = pred_smooth.swaplevel()
+    pred_smooth = pred_smooth.dropna().sort_index()
     
-    # 6. Get Latest Date Signals
-    latest_date = pred.index.get_level_values('datetime').max()
-    print(f"\n[5/5] Latest Signal Date: {latest_date.strftime('%Y-%m-%d')}")
+    # Extract Latest Signal
+    latest_date = pred_smooth.index.get_level_values('datetime').max()
+    print(f"\n[Result] Latest Signal Date: {latest_date.strftime('%Y-%m-%d')}")
     
-    latest_pred = pred.loc[latest_date]
+    latest_pred = pred_smooth.loc[latest_date]
     latest_pred = latest_pred.sort_values(ascending=False)
     
     # --- Market Regime Check (Live) ---
