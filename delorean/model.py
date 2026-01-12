@@ -5,6 +5,7 @@ from qlib.workflow import R
 import pandas as pd
 import lightgbm as lgb
 import numpy as np
+from delorean.config import MODEL_PARAMS_STAGE1, MODEL_PARAMS_STAGE2
 
 class ModelTrainer:
     """
@@ -37,19 +38,8 @@ class ModelTrainer:
             y_train = df_train["label"]
             
             # Optimized params for Stage 2 (smaller refined model)
-            params = {
-                "objective": "regression",
-                "metric": "mse",
-                "learning_rate": 0.03, # Slower learning for robustness
-                "num_leaves": 15,      # Smaller trees
-                "colsample_bytree": 0.6,
-                "subsample": 0.6,
-                "reg_alpha": 1.0,      # Stronger L1
-                "reg_lambda": 1.0,     # Stronger L2
-                "n_jobs": -1,
-                "verbosity": -1,
-                "seed": self.seed
-            }
+            params = MODEL_PARAMS_STAGE2.copy()
+            params["seed"] = self.seed
             self.params = params
             
             # Create native dataset
@@ -68,20 +58,9 @@ class ModelTrainer:
             print("\nUsing LightGBM Model (Optimized - Exp 8)...")
             self.selected_features = None
             # Hyperparameters tuned in Experiment 8
-            self.params = {
-                "loss": "mse",
-                "colsample_bytree": 0.887,
-                "learning_rate": 0.05,
-                "subsample": 0.7,
-                "lambda_l1": 0.5,
-                "lambda_l2": 0.5,
-                "max_depth": -1,
-                "num_leaves": 31,
-                "min_data_in_leaf": 30,
-                "early_stopping_rounds": 100,
-                "num_boost_round": 1000,
-                "seed": self.seed
-            }
+            # Hyperparameters tuned in Experiment 8
+            self.params = MODEL_PARAMS_STAGE1.copy()
+            self.params["seed"] = self.seed
             self.model = LGBModel(**self.params)
             print("Starts training...")
             self.model.fit(dataset)

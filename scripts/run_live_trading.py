@@ -238,13 +238,19 @@ def get_trading_signal(topk=5):
          close_map = feat_reset['close'].to_dict()
 
     if is_bull:
-        # Bull Market: Top K
-        for i, (symbol, score) in enumerate(latest_pred.head(topk).items(), 1):
+        # Bull Market: Top K + Buffer
+        # We include topk + 2 items. The extra 2 are "buffer" items.
+        buffer_size = 2
+        for i, (symbol, score) in enumerate(latest_pred.head(topk + buffer_size).items(), 1):
              vol_raw = vol_map.get(symbol, 0.0)
              close_price = close_map.get(symbol, 0.0)
              
+             is_buffer = i > topk
+             
              # Weight Calculation
-             weight = 1.0 / topk 
+             # Buffer items get 0 weight initially (frontend can display them as holding candidates)
+             # Top K items get 1/K weight
+             weight = 1.0 / topk if not is_buffer else 0.0
              
              item = {
                 "rank": i,
@@ -254,7 +260,7 @@ def get_trading_signal(topk=5):
                 "volatility": float(vol_raw),
                 "current_price": float(close_price),
                 "target_weight": float(weight),
-                "is_buffer": False
+                "is_buffer": is_buffer
             }
              rec_artifact["top_recommendations"].append(item)
     else:

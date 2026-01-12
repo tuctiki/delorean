@@ -59,3 +59,20 @@ The script will output the **Top 4 ETFs** and their scores.
 ------------------------------
 ```
 *Action*: Ensure these 4 assets are in your portfolio.
+
+## Dashboard Backend & Frontend
+
+To view the dashboard, you need to start both the Backend (API) and the Frontend (UI).
+
+### 1. Start Backend Server
+```bash
+conda run -n quant python server/main.py
+```
+*Runs on http://localhost:8000*
+
+### 2. Start Frontend Server
+```bash
+cd frontend
+npm run dev
+```
+*Runs on http://localhost:3000*

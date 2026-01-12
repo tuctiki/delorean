@@ -53,3 +53,35 @@ import os
 OUTPUT_DIR = "artifacts"
 if not os.path.exists(OUTPUT_DIR):
     os.makedirs(OUTPUT_DIR)
+
+# Model Hyperparameters
+# Stage 1: Standard Qlib LGBModel (Experiment 8 Optimized)
+MODEL_PARAMS_STAGE1 = {
+    "loss": "mse",
+    "colsample_bytree": 0.887,
+    "learning_rate": 0.05,
+    "subsample": 0.7,
+    "lambda_l1": 0.5,
+    "lambda_l2": 0.5,
+    "max_depth": -1,
+    "num_leaves": 31,
+    "min_data_in_leaf": 30,
+    "early_stopping_rounds": 100,
+    "num_boost_round": 1000
+    # Seed injected at runtime
+}
+
+# Stage 2: Refined Native LightGBM (Selected Features)
+MODEL_PARAMS_STAGE2 = {
+    "objective": "regression",
+    "metric": "mse",
+    "learning_rate": 0.03, # Slower learning for robustness
+    "num_leaves": 15,      # Smaller trees
+    "colsample_bytree": 0.6,
+    "subsample": 0.6,
+    "reg_alpha": 1.0,      # Stronger L1
+    "reg_lambda": 1.0,     # Stronger L2
+    "n_jobs": -1,
+    "verbosity": -1,
+    # Seed injected at runtime
+}

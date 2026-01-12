@@ -4,6 +4,8 @@ from qlib.backtest import backtest as qlib_backtest
 from qlib.backtest import executor as qlib_executor
 from qlib.backtest.decision import Order, OrderDir, TradeDecisionWO
 from .config import TEST_START_TIME, END_TIME, BENCHMARK
+from .strategy.portfolio import PortfolioOptimizer
+from .strategy.execution import ExecutionModel
 import pandas as pd
 import copy
 
@@ -44,9 +46,12 @@ class SimpleTopkStrategy(BaseSignalStrategy):
         self.n_drop = n_drop
         self.buffer = buffer
         self.market_regime = market_regime
-        self.vol_feature = vol_feature # Index: (datetime, instrument), Value: VOL20
-        self.trend_feature = trend_feature # Index: (datetime, instrument), Value: Price/MA60 Ratio
-        self.last_risk_degree = risk_degree # State for Hysteresis
+        self.vol_feature = vol_feature 
+        self.trend_feature = trend_feature 
+        
+        # Initialize Sub-Models
+        self.optimizer = PortfolioOptimizer(topk=topk, risk_degree=risk_degree)
+        self.execution = ExecutionModel(topk=topk, buffer=buffer, n_drop=n_drop)
 
     def generate_trade_decision(self, execute_result: Any = None) -> TradeDecisionWO:
         """
@@ -56,10 +61,8 @@ class SimpleTopkStrategy(BaseSignalStrategy):
         trade_step = self.trade_calendar.get_trade_step()
         trade_start_time, trade_end_time = self.trade_calendar.get_step_time(trade_step)
 
-        # 0. Market Regime (Per-Asset Trend Filter)
-        current_risk_degree = self.risk_degree # Fixed risk degree (we filter assets instead)
-        
-        # If market_regime provided (Boolean Series) - Legacy/Override
+        # 0. Market Regime (Per-Asset Trend Filter Logic remains here or moves to AlphaModel?)
+        # For now, keep high-level regime check here.
         if self.market_regime is not None:
              try:
                 is_bull = self.market_regime.loc[trade_start_time] if trade_start_time in self.market_regime.index else True
@@ -70,20 +73,13 @@ class SimpleTopkStrategy(BaseSignalStrategy):
                  # Standard Regime Filter: Sell All (Cash)
                  return TradeDecisionWO(self._generate_sell_orders(self.trade_position, pd.Index([]), trade_start_time, trade_end_time), self)
         
-        # Update State
-        self.last_risk_degree = current_risk_degree
-        
-        # 0.5 Turnover control: Probabilistic Retention
-        # If random < drop_rate, we SKIP trading this step (hold existing)
-        # Only applies in Bull Market (if we are here)
-        
-        # [FIX] Do NOT skip if we need to ENTER the market (current holdings empty but bullish)
+        # 0.5 Turnover control: Probabilistic Retention (Pre-check)
+        # Note: Ideally this should move to ExecutionModel too, but it short-circuits everything.
+        current_risk_degree = self.risk_degree 
         current_holdings_list = self.trade_position.get_stock_list()
         should_force_trade = (len(current_holdings_list) == 0) and (current_risk_degree > 0)
         
         if (not should_force_trade) and (random.random() < self.drop_rate):
-            # IMPORTANT: If using Dynamic Exposure, we might need to REBALANCE cash even if we skip turnover rotation.
-            # But simplistic approach: if skip, do nothing.
             return TradeDecisionWO([], self)
         
         # 2. Get Scores
@@ -91,231 +87,45 @@ class SimpleTopkStrategy(BaseSignalStrategy):
         if pred_score is None:
             return TradeDecisionWO([], self)
             
-        # 3. Determine Target Stocks (Top K)
-        # Filter for Per-Asset Trend
-        valid_candidates = pred_score.index
-        
+        # 3. Filter Candidates (Trend Filter)
+        # This logic could belong to a signal processor/AlphaModel
         if self.trend_feature is not None:
-            # Get trends for this date
             try:
-                # trend_feature is (datetime, instrument) -> value
-                # We need to slice current date
                 current_trends = self.trend_feature.loc[trade_start_time]
-                
                 # Identify valid (Bull) stocks: Ratio > 1.0
-                # Assuming index is instrument
-                valid_mask = current_trends > 1.0
-                
-                # Filter candidates
-                # Candidates are in pred_score (instrument)
-                # Join to safely apply mask
-                
-                # Convert pred_score to df to join
-                df_score = pred_score.to_frame('score')
-                df_score['trend'] = current_trends
-                
-                # Default missing trend to 1.0 (Neutral/Bull) or 0.0 (Bear)?
-                # Let's say missing = Bull (pass) to be safe against data gaps, or strictly Bear?
-                # User wants "Liquidate All based on HS300" replacement.
-                # If we don't have data, we assume Bull?
-                df_score['trend'] = df_score['trend'].fillna(1.0)
-                
-                # Filter
-                valid_df = df_score[df_score['trend'] > 1.0]
-                
-                # Re-assign pred_score to filtered only
-                pred_score = valid_df['score']
-                
+                # Align logic with index handling
+                if isinstance(pred_score, pd.Series):
+                    # Align indices
+                    common = pred_score.index.intersection(current_trends.index)
+                    if not common.empty:
+                         trends_aligned = current_trends.loc[common]
+                         valid_mask = trends_aligned > 1.0
+                         pred_score = pred_score.loc[common[valid_mask]]         
             except Exception as e:
-                pass # Proceed with all if error
+                pass 
 
-        # We need the full sorted list to find best replacements if needed
+        # 4. Portfolio Optimization (Target Weights)
+        # Sort and take top K candidates for weighting
         sorted_score = pred_score.sort_values(ascending=False)
-        target_stocks = sorted_score.head(self.topk).index
+        target_stocks = sorted_score.head(self.topk).index.tolist()
         
-        # 4. Current Position Snapshot
-        current_temp = copy.deepcopy(self.trade_position)
-        current_stock_list = current_temp.get_stock_list()
+        target_weights = self.optimizer.calculate_weights(
+            target_stocks, 
+            trade_start_time, 
+            vol_feature=self.vol_feature
+        )
         
-        # 5. Sell Logic with Buffer Hysteresis
-        # Calculate Ranks (1 is best)
-        # ascending=False means higher score = lower rank number? No.
-        # rank(ascending=False): Higher score gets Rank 1. Correct.
-        ranks = pred_score.rank(ascending=False)
-        
-        # Identify stocks to drop (Rank > TopK + Buffer)
-        to_drop = []
-        kept_stocks = []
-        
-        for code in current_stock_list:
-            # If code not in pred, assume worst rank -> Drop
-            rank = ranks.get(code, 99999)
-            
-            if rank > (self.topk + self.buffer):
-                to_drop.append(code)
-            else:
-                kept_stocks.append(code)
-                
-        # Apply n_drop limit (optional, but requested by user as 'Aggressive Filter' previously)
-        # If we have too many to drop, only drop the worst ones up to n_drop?
-        # Or should Buffer override n_drop? 
-        # User prompt implies Buffer is the main logic.
-        # Let's keep n_drop as a "max turnover per day" safety valve if strictly needed,
-        # but usually with buffer=2, turnover is low. 
-        # If we have 2 to drop and n_drop=1, we only drop 1 (the worst one).
-        
-        # Sort to_drop by Rank (worst first)
-        to_drop.sort(key=lambda x: ranks.get(x, 99999), reverse=True)
-        to_drop = to_drop[:self.n_drop]
-        
-        # Update kept_stocks if we couldn't drop some due to n_drop
-        # Actually kept_stocks logic above was "what we WANT to keep".
-        # If we are forced to keep something because n_drop limit, it remains in holdings.
-        # So we don't need to explicitly add back to kept_stocks, just implicit in calculate.
+        # 5. Execution (Generate Orders)
+        orders = self.execution.generate_orders(
+            current_pos=self.trade_position,
+            pred_score=pred_score,
+            target_weights=target_weights,
+            trade_exchange=self.trade_exchange,
+            trade_start_time=trade_start_time,
+            trade_end_time=trade_end_time
+        )
 
-
-
-        
-        sell_order_list = []
-        for code in to_drop:
-            if not self.trade_exchange.is_stock_tradable(stock_id=code, start_time=trade_start_time, end_time=trade_end_time, direction=OrderDir.SELL):
-                continue
-            
-            sell_amount = current_temp.get_stock_amount(code=code)
-            sell_order = Order(
-                stock_id=code,
-                amount=sell_amount,
-                start_time=trade_start_time,
-                end_time=trade_end_time,
-                direction=Order.SELL
-            )
-            if self.trade_exchange.check_order(sell_order):
-                sell_order_list.append(sell_order)
-                # Update temp position to free cash
-                self.trade_exchange.deal_order(sell_order, position=current_temp)
-
-        # 6. Buy Logic
-        # We want to fill up to `topk`.
-        
-        buy_order_list = []
-        sell_order_rebalance_list = []
-        
-        # Calculate what we will hold after sells
-        # current_holdings_after_sell = [code for code in current_stock_list if code not in to_drop]
-        # Using current_temp is accurate as we dealt orders.
-        current_holdings_after_sell = current_temp.get_stock_list()
-        
-        # 6. Buy Logic
-        # Fill available slots up to self.topk
-        slots_available = self.topk - len(current_holdings_after_sell)
-        
-        final_target_stocks = list(current_holdings_after_sell)
-        
-        if slots_available > 0:
-            # Pick best candidates from sorted_score that are NOT in current holdings
-            # sorted_score is Series with index=code, value=score. Already sorted desc.
-            candidates = sorted_score.index.tolist()
-            to_buy = []
-            for code in candidates:
-                if len(to_buy) >= slots_available:
-                    break
-                if code not in current_holdings_after_sell:
-                    to_buy.append(code)
-            
-            final_target_stocks.extend(to_buy)
-        else:
-            to_buy = []
-
-        # [NEW] Volatility Targeting (Risk Parity)
-        # Calculate weights for final_target_stocks
-        # Formula: w_i = (1/vol_i) / sum(1/vol_j)
-        
-        target_weights = {} # code -> weight
-        
-        if self.vol_feature is not None:
-             # Get volatility for these stocks on this date
-             inv_vols = {}
-             sum_inv_vol = 0.0
-             
-             for code in final_target_stocks:
-                 try:
-                     vol = self.vol_feature.loc[(trade_start_time, code)]
-                     if pd.isna(vol) or vol <= 0: vol = 1.0 # Fallback
-                 except:
-                     vol = 1.0 # Fallback
-                     
-                 inv_vol = 1.0 / vol
-                 inv_vols[code] = inv_vol
-                 sum_inv_vol += inv_vol
-                 
-             if sum_inv_vol > 0:
-                 for code in final_target_stocks:
-                     target_weights[code] = inv_vols[code] / sum_inv_vol
-             else:
-                 # Fallback to EW
-                 for code in final_target_stocks:
-                     target_weights[code] = 1.0 / len(final_target_stocks)
-        else:
-             # Equal Weight
-             for code in final_target_stocks:
-                 target_weights[code] = 1.0 / len(final_target_stocks)
-
-        # Execute Buys / Rebalance
-        # Calculate target value
-        current_total_value = current_temp.calculate_value()
-        
-        # [OPTIMIZATION] Buffer Rebalancing
-        # Threshold: 2% of total portfolio value
-        buffer_threshold = current_total_value * 0.02
-        
-        for code in final_target_stocks:
-            # Buy/Sell to reach target weight
-            target_val = current_total_value * current_risk_degree * target_weights[code]
-            
-            current_amount = current_temp.get_stock_amount(code=code)
-            
-             # Check Price
-            if not self.trade_exchange.is_stock_tradable(stock_id=code, start_time=trade_start_time, end_time=trade_end_time, direction=OrderDir.BUY):
-                 continue
-            current_price = self.trade_exchange.get_deal_price(stock_id=code, start_time=trade_start_time, end_time=trade_end_time, direction=OrderDir.BUY)
-            
-            target_amount = target_val / current_price
-            diff_amount = target_amount - current_amount
-            diff_val = diff_amount * current_price
-            
-            # Skip if deviation is within buffer (unless it is a new buy which effectively has diff_val = target_val)
-            # Actually diff_val is the absolute dollar amount we want to trade.
-            if abs(diff_val) < buffer_threshold:
-                continue
-            
-            factor = self.trade_exchange.get_factor(stock_id=code, start_time=trade_start_time, end_time=trade_end_time)
-            
-            if diff_amount > 0:
-                # Buy
-                buy_amount = self.trade_exchange.round_amount_by_trade_unit(diff_amount, factor)
-                if buy_amount > 0:
-                     buy_order = Order(
-                        stock_id=code,
-                        amount=buy_amount,
-                        start_time=trade_start_time,
-                        end_time=trade_end_time,
-                        direction=OrderDir.BUY
-                    )
-                     buy_order_list.append(buy_order)
-            elif diff_amount < 0:
-                # Sell (Rebalance Down)
-                sell_amount = self.trade_exchange.round_amount_by_trade_unit(abs(diff_amount), factor)
-                if sell_amount > 0:
-                     sell_order = Order(
-                        stock_id=code,
-                        amount=sell_amount,
-                        start_time=trade_start_time,
-                        end_time=trade_end_time,
-                        direction=OrderDir.SELL
-                    )
-                     sell_order_rebalance_list.append(sell_order)
-
-        return TradeDecisionWO(sell_order_list + sell_order_rebalance_list + buy_order_list, self)
+        return TradeDecisionWO(orders, self)
 
     def _get_pred_scores(self, trade_step: int) -> Optional[pd.Series]:
         """Fetch prediction scores for the next trading day (shift=1)."""
@@ -331,81 +141,9 @@ class SimpleTopkStrategy(BaseSignalStrategy):
         """Identify Top K stocks."""
         return pred_score.sort_values(ascending=False).head(self.topk).index
 
-    def _generate_sell_orders(self, current_pos: Any, target_stocks: pd.Index, 
-                              start_time: pd.Timestamp, end_time: pd.Timestamp) -> List[Order]:
-        """Generate sell orders for stocks not in the target list."""
-        sell_order_list = []
-        current_stock_list = current_pos.get_stock_list()
-        
-        for code in current_stock_list:
-            if code not in target_stocks:
-                if not self.trade_exchange.is_stock_tradable(stock_id=code, start_time=start_time, end_time=end_time, direction=OrderDir.SELL):
-                    continue
-                
-                sell_amount = current_pos.get_stock_amount(code=code)
-                sell_order = Order(
-                    stock_id=code,
-                    amount=sell_amount,
-                    start_time=start_time,
-                    end_time=end_time,
-                    direction=Order.SELL
-                )
-                if self.trade_exchange.check_order(sell_order):
-                    sell_order_list.append(sell_order)
-        
-        return sell_order_list
 
-    def _generate_buy_orders(self, current_pos: Any, target_stocks: pd.Index, 
-                             start_time: pd.Timestamp, end_time: pd.Timestamp) -> List[Order]:
-        """Generate buy/adjust orders to reach equal weight for target stocks."""
-        buy_order_list = []
-        sell_order_rebalance_list = []
-        
-        # Calculate target value per stock (Equal Weight based on current total value)
-        current_value = current_pos.calculate_value()
-        target_value_per_stock = current_value * self.risk_degree / self.topk
-        
-        for code in target_stocks:
-            if not self.trade_exchange.is_stock_tradable(stock_id=code, start_time=start_time, end_time=end_time, direction=OrderDir.BUY):
-                continue
-            
-            # Current holding
-            current_amount = current_pos.get_stock_amount(code=code)
-            current_price = self.trade_exchange.get_deal_price(stock_id=code, start_time=start_time, end_time=end_time, direction=OrderDir.BUY)
-            
-            # Gap
-            target_amount = target_value_per_stock / current_price
-            msg_amount = target_amount - current_amount
-            
-            # Determine direction
-            if msg_amount > 0:
-                # Buy
-                factor = self.trade_exchange.get_factor(stock_id=code, start_time=start_time, end_time=end_time)
-                buy_amount = self.trade_exchange.round_amount_by_trade_unit(msg_amount, factor)
-                if buy_amount > 0:
-                    buy_order = Order(
-                        stock_id=code,
-                        amount=buy_amount,
-                        start_time=start_time,
-                        end_time=end_time,
-                        direction=OrderDir.BUY
-                    )
-                    buy_order_list.append(buy_order)
-            elif msg_amount < 0:
-                 # Sell (Rebalance down)
-                 sell_amount = abs(msg_amount)
-                 sell_order = Order(
-                    stock_id=code,
-                    amount=sell_amount,
-                    start_time=start_time,
-                    end_time=end_time,
-                    direction=Order.SELL
-                 )
-                 sell_order_rebalance_list.append(sell_order)
 
-        # Combine rebalance sells and buys. 
-        # Note: Strategy usually returns all orders.
-        return sell_order_rebalance_list + buy_order_list
+
 
 class BacktestEngine:
     """

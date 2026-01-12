@@ -9,8 +9,13 @@ The project has been refactored into a modular structure:
 -   **`delorean/`**: Core Python package containing logic for data handling, modeling, backtesting, and analysis.
     -   `data.py`: Data loading and feature engineering (Custom, Alpha158, Hybrid).
     -   `model.py`: LightGBM model training and inference.
-    -   `backtest.py`: Strategy logic and backtest engine.
+    -   `backtest.py`: Backtesting engine and strategy composition.
     -   `config.py`: Centralized configuration.
+    -   `pipeline.py`: Daily task orchestration.
+    -   **`strategy/`**: Modular strategy components.
+        -   `portfolio.py`: Weight calculation (Equal Weight / Risk Parity).
+        -   `execution.py`: Order generation and turnover control.
+-   **`tests/`**: Unit tests for stability and regression prevention.
 -   **`scripts/`**: Executable scripts for various tasks.
     -   `download_etf_data_to_csv.py`: Fetches data from AkShare.
     -   `run_etf_analysis.py`: Runs end-to-end training and backtesting analysis.
@@ -26,7 +31,19 @@ The project has been refactored into a modular structure:
     ```bash
     pip install -r requirements.txt
     ```
-    *(Note: Ensure `akshare`, `qlib`, `fastapi`, `uvicorn`, `pandas`, `lightgbm` are installed)*
+    *(Note: Ensure `akshare`, `qlib`, `fastapi`, `uvicorn`, `pandas`, `lightgbm`, `pytest` are installed)*
+
+## Testing
+
+The project includes a `pytest` suite for unit testing key components.
+
+```bash
+conda run -n quant python -m pytest tests/
+```
+
+Key tests cover:
+- Data Handlers (`tests/test_data_handler.py`)
+- Strategy Composition (`tests/test_strategy.py`)
 
 ## Usage
 
