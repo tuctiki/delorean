@@ -58,14 +58,14 @@ if not os.path.exists(OUTPUT_DIR):
 # Stage 1: Standard Qlib LGBModel (Experiment 8 Optimized)
 MODEL_PARAMS_STAGE1 = {
     "loss": "mse",
-    "colsample_bytree": 0.887,
-    "learning_rate": 0.05,
-    "subsample": 0.7,
-    "lambda_l1": 0.5,
-    "lambda_l2": 0.5,
-    "max_depth": -1,
-    "num_leaves": 31,
-    "min_data_in_leaf": 30,
+    "colsample_bytree": 0.6116,
+    "learning_rate": 0.02,
+    "subsample": 0.6,
+    "lambda_l1": 7.5,
+    "lambda_l2": 2.5,
+    "max_depth": 5,
+    "num_leaves": 19,
+    "min_data_in_leaf": 34,
     "early_stopping_rounds": 100,
     "num_boost_round": 1000
     # Seed injected at runtime

@@ -20,13 +20,14 @@ class ModelTrainer:
         self.params: Dict[str, Any] = {}
         self.seed = seed
 
-    def train(self, dataset: DatasetH, selected_features: Optional[List[str]] = None) -> None:
+    def train(self, dataset: DatasetH, selected_features: Optional[List[str]] = None, params: Optional[Dict[str, Any]] = None) -> None:
         """
         Train the LightGBM model.
         
         Args:
             dataset (DatasetH): The Qlib dataset object.
             selected_features (List[str], optional): If provided, train ONLY on these features using native LightGBM.
+            params (Dict[str, Any], optional): Custom hyperparameters to override config.
         """
         if selected_features:
             print(f"\nTraining Optimized LightGBM on {len(selected_features)} selected features...")
@@ -38,16 +39,20 @@ class ModelTrainer:
             y_train = df_train["label"]
             
             # Optimized params for Stage 2 (smaller refined model)
-            params = MODEL_PARAMS_STAGE2.copy()
-            params["seed"] = self.seed
-            self.params = params
+            # Merge with custom params if provided
+            default_params = MODEL_PARAMS_STAGE2.copy()
+            if params:
+                default_params.update(params)
+                
+            default_params["seed"] = self.seed
+            self.params = default_params
             
             # Create native dataset
             dtrain = lgb.Dataset(X_train, label=y_train)
             
             # Train
             self.model = lgb.train(
-                params,
+                self.params,
                 dtrain,
                 num_boost_round=1000,
                 callbacks=[lgb.early_stopping(100), lgb.log_evaluation(100)],
@@ -58,9 +63,12 @@ class ModelTrainer:
             print("\nUsing LightGBM Model (Optimized - Exp 8)...")
             self.selected_features = None
             # Hyperparameters tuned in Experiment 8
-            # Hyperparameters tuned in Experiment 8
-            self.params = MODEL_PARAMS_STAGE1.copy()
-            self.params["seed"] = self.seed
+            default_params = MODEL_PARAMS_STAGE1.copy()
+            if params:
+                default_params.update(params)
+                
+            default_params["seed"] = self.seed
+            self.params = default_params
             self.model = LGBModel(**self.params)
             print("Starts training...")
             self.model.fit(dataset)
