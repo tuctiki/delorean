@@ -73,7 +73,7 @@ python scripts/run_etf_analysis.py \
 
 **Options:**
 -   `--label_horizon <int>`: Forecast horizon in days (default: 5).
--   `--smooth_window <int>`: EWMA smoothing for signals (default: 20).
+-   `--smooth_window <int>`: EWMA smoothing for signals (default: 15).
 -   `--dynamic_exposure`: Enable Trend-based Dynamic Exposure (Manage Beta).
 -   `--risk_parity`: Enable Volatility Targeting (Optional, 1/Vol weighting).
 -   `--start_time / --end_time`: Data range overrides.
@@ -91,6 +91,9 @@ The strategy utilizes a **Custom Hybrid Factor Model** composed of 7 robust fact
 5.  **VOL20**: `Std($close / Ref($close, 1) - 1, 20)` - Short-term Volatility.
 6.  **VOL60**: `Std($close / Ref($close, 1) - 1, 60)` - Medium-term Volatility.
 7.  **VOL120**: `Std($close / Ref($close, 1) - 1, 120)` - Long-term Volatility.
+8.  **BB_Width_Norm**: Normalized Bollinger Band Width (Volatility).
+9.  **KC_Width_Norm**: Normalized Keltner Channel Width (True Range Volatility).
+10. **Squeeze_Ratio**: Ratio of BB Width to KC Width (Detects volatility squeeze/expansion regimes).
 
 **Optimization Technique**:
 -   **Preprocessing**: Cross-Sectional Z-Score Feature Neutralization.
