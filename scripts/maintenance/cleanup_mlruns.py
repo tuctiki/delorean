@@ -3,7 +3,8 @@ import shutil
 import sys
 import datetime
 
-MLRUNS_DIR = "mlruns"
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+MLRUNS_DIR = os.path.join(PROJECT_ROOT, "mlruns")
 print(f"Cleaning up {MLRUNS_DIR}...")
 
 if not os.path.exists(MLRUNS_DIR):

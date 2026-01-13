@@ -6,7 +6,7 @@ import numpy as np
 import logging
 
 # Add project root
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from delorean.data import ETFDataLoader
 from delorean.model import ModelTrainer

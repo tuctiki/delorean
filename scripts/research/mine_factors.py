@@ -7,7 +7,7 @@ from gplearn.genetic import SymbolicTransformer
 from sklearn.model_selection import train_test_split
 
 # Add project root
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from delorean.data import ETFDataLoader
 from delorean.config import ETF_LIST, START_TIME, END_TIME, BENCHMARK, QLIB_PROVIDER_URI
