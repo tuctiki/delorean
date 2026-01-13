@@ -35,6 +35,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--test_start_time", type=str, default=None, help="Test Start Time (e.g. 2022-01-01)")
     parser.add_argument("--end_time", type=str, default=None, help="Backtest End Time (e.g. 2025-12-31)")
     parser.add_argument("--experiment_name", type=str, default=None, help="Custom MLflow Experiment Name")
+    parser.add_argument("--no_regime", action="store_true", help="Disable Market Regime Filter (Stress Test)")
     
     return parser.parse_args()
 
@@ -66,7 +67,7 @@ def main() -> None:
 
 
     # 1. Initialize Qlib
-    qlib.init(provider_uri=QLIB_PROVIDER_URI, region=QLIB_REGION)
+    qlib.init(provider_uri=QLIB_PROVIDER_URI, region=QLIB_REGION, kernels=1)
 
     # Time Config Overrides
     start_time = args.start_time if args.start_time else START_TIME
@@ -196,7 +197,12 @@ def main() -> None:
         bench_close['ma60'] = bench_close['close'].rolling(window=60).mean()
         
         # Define Regime: True = Bull (Close > MA60), False = Bear (Close <= MA60)
-        market_regime = bench_close['close'] > bench_close['ma60']
+        if args.no_regime:
+            print("Market Regime Filter: DISABLED (Forced Bull)")
+            market_regime = None
+        else:
+            print(f"Market Regime Filter: ENABLED (Close > MA60)")
+            market_regime = bench_close['close'] > bench_close['ma60']
         
         # [FIX] Enforce Test Range Slicing
         # Ensure backtest only runs on the requested test period
