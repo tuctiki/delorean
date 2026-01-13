@@ -218,86 +218,118 @@ def get_experiment_results():
             return json.load(f)
     return {}
 
-@app.get("/api/experiments/{experiment_id}")
-def get_experiment_details(experiment_id: str):
-    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    exp_path = os.path.join(root, "mlruns", experiment_id)
+@app.get("/api/experiments/{run_id}")
+def get_experiment_details(run_id: str):
+    """
+    Get details for a specific run by its ID.
+    Now expects a run_id (not experiment_id) since we use flat run listing.
+    """
+    from delorean.config import DEFAULT_EXPERIMENT_NAME
     
-    if not os.path.exists(exp_path):
-        raise HTTPException(status_code=404, detail="Experiment not found")
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    mlruns_path = os.path.join(root, "mlruns")
+    
+    # Find the default experiment folder
+    default_exp_path = None
+    for d in os.listdir(mlruns_path):
+        full_path = os.path.join(mlruns_path, d)
+        if os.path.isdir(full_path) and d.isdigit():
+            meta_path = os.path.join(full_path, "meta.yaml")
+            if os.path.exists(meta_path):
+                try:
+                    with open(meta_path, "r") as f:
+                        for line in f:
+                            if line.strip().startswith("name:"):
+                                exp_name = line.split(":", 1)[1].strip()
+                                if exp_name == DEFAULT_EXPERIMENT_NAME:
+                                    default_exp_path = full_path
+                                    break
+                except: pass
+            if default_exp_path:
+                break
+    
+    if not default_exp_path:
+        raise HTTPException(status_code=404, detail="Default experiment not found")
+    
+    # Find the run
+    run_path = os.path.join(default_exp_path, run_id)
+    if not os.path.exists(run_path):
+        raise HTTPException(status_code=404, detail=f"Run {run_id} not found")
         
     details = {
-        "id": experiment_id,
-        "artifact_location": exp_path,
+        "id": run_id,
+        "artifact_location": run_path,
         "params": {},
         "metrics": {},
         "status": "FINISHED" 
     }
     
-    # Simple parse of mlruns structure (assuming FileStore)
-    # usually there's a meta.yaml and subdirs for runs.
-    # But Qlib's default FileSystemRecorder structure:
-    # mlruns/experiment_id/run_id/params/
-    # mlruns/experiment_id/run_id/metrics/
-    
-    # We will just pick the LATEST run for this experiment to show details
-    if os.path.exists(exp_path):
-        runs = [d for d in os.listdir(exp_path) if os.path.isdir(os.path.join(exp_path, d)) and len(d) > 20]
-        # Sort by modification time to get latest
-        runs.sort(key=lambda x: os.path.getmtime(os.path.join(exp_path, x)), reverse=True)
-        
-        if runs:
-            latest_run = runs[0]
-            run_path = os.path.join(exp_path, latest_run)
-            
-            # Read Params
-            params_path = os.path.join(run_path, "params")
-            if os.path.exists(params_path):
-                for f in os.listdir(params_path):
-                    try:
-                        with open(os.path.join(params_path, f), "r") as pf:
-                            details["params"][f] = pf.read().strip()
-                    except: pass
-                    
-            # Read Metrics
-            metrics_path = os.path.join(run_path, "metrics")
-            if os.path.exists(metrics_path):
-                for f in os.listdir(metrics_path):
-                    try:
-                        with open(os.path.join(metrics_path, f), "r") as mf:
-                            # Metrics file contains value timestamp
-                            # 0.0023 123123123
-                            content = mf.read().split()[0]
-                            details["metrics"][f] = float(content)
-                    except: pass
-                    
+    # Read Params
+    params_path = os.path.join(run_path, "params")
+    if os.path.exists(params_path):
+        for f in os.listdir(params_path):
+            try:
+                with open(os.path.join(params_path, f), "r") as pf:
+                    details["params"][f] = pf.read().strip()
+            except: pass
+                
+    # Read Metrics
+    metrics_path = os.path.join(run_path, "metrics")
+    if os.path.exists(metrics_path):
+        for f in os.listdir(metrics_path):
+            try:
+                with open(os.path.join(metrics_path, f), "r") as mf:
+                    parts = mf.read().strip().split()
+                    if len(parts) >= 2:
+                        val = float(parts[1])
+                        if not (math.isnan(val) or math.isinf(val)):
+                            details["metrics"][f] = val
+            except: pass
+                
     return details
 
-@app.get("/api/experiments/{experiment_id}/image")
-def get_experiment_image(experiment_id: str, name: str):
+@app.get("/api/experiments/{run_id}/image")
+def get_experiment_image(run_id: str, name: str):
+    """
+    Get an image artifact from a specific run.
+    Now expects a run_id (not experiment_id) since we use flat run listing.
+    """
+    from delorean.config import DEFAULT_EXPERIMENT_NAME
+    
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    exp_path = os.path.join(root, "mlruns", experiment_id)
+    mlruns_path = os.path.join(root, "mlruns")
     
-    if not os.path.exists(exp_path):
-        raise HTTPException(status_code=404, detail="Experiment not found")
-        
-    # Get latest run
-    runs = [d for d in os.listdir(exp_path) if os.path.isdir(os.path.join(exp_path, d)) and len(d) > 20]
-    if not runs:
-        raise HTTPException(status_code=404, detail="No runs found")
-        
-    runs.sort(key=lambda x: os.path.getmtime(os.path.join(exp_path, x)), reverse=True)
-    latest_run = runs[0]
+    # Find the default experiment folder
+    default_exp_path = None
+    for d in os.listdir(mlruns_path):
+        full_path = os.path.join(mlruns_path, d)
+        if os.path.isdir(full_path) and d.isdigit():
+            meta_path = os.path.join(full_path, "meta.yaml")
+            if os.path.exists(meta_path):
+                try:
+                    with open(meta_path, "r") as f:
+                        for line in f:
+                            if line.strip().startswith("name:"):
+                                exp_name = line.split(":", 1)[1].strip()
+                                if exp_name == DEFAULT_EXPERIMENT_NAME:
+                                    default_exp_path = full_path
+                                    break
+                except: pass
+            if default_exp_path:
+                break
     
-    # Check standard artifacts location (Qlib/MLflow default)
-    # 1. mlruns/exp/run/artifacts/name
-    # 2. mlruns/exp/run/name (sometimes direct)
+    if not default_exp_path:
+        raise HTTPException(status_code=404, detail="Default experiment not found")
     
+    # Find the run
+    run_path = os.path.join(default_exp_path, run_id)
+    if not os.path.exists(run_path):
+        raise HTTPException(status_code=404, detail=f"Run {run_id} not found")
+    
+    # Check standard artifacts location
     possible_paths = [
-        os.path.join(exp_path, latest_run, "artifacts", name),
-        os.path.join(exp_path, latest_run, name),
-        # [REMOVED] Fallback to project artifacts is dangerous as it causes identical plots across experiments
-        # os.path.join(root, "artifacts", name)
+        os.path.join(run_path, "artifacts", name),
+        os.path.join(run_path, name),
     ]
     
     for p in possible_paths:
