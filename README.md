@@ -12,6 +12,7 @@ The project has been refactored into a modular structure:
     -   `backtest.py`: Backtesting engine and strategy composition.
     -   `config.py`: Centralized configuration.
     -   `pipeline.py`: Daily task orchestration.
+    -   `utils.py`: Centralized utilities (smoothing, IC calculation).
     -   **`strategy/`**: Modular strategy components.
         -   `portfolio.py`: Weight calculation (Equal Weight / Risk Parity).
         -   `execution.py`: Order generation and turnover control.
@@ -44,6 +45,7 @@ conda run -n quant python -m pytest tests/
 Key tests cover:
 - Data Handlers (`tests/test_data_handler.py`)
 - Strategy Composition (`tests/test_strategy.py`)
+- Utilities (`tests/test_utils.py`)
 
 ## Usage
 
@@ -99,7 +101,7 @@ python scripts/run_etf_analysis.py \
 ## Implementation Details
 
 ### Factor Models
-The strategy utilizes a **Custom Hybrid Factor Model** composed of 7 robust factors optimized for the Chinese ETF market:
+The strategy utilizes a **Custom Hybrid Factor Model** composed of 12 robust factors optimized for the Chinese ETF market:
 
 1.  **MarketCap_Liquidity**: `Log(Mean($volume * $close, 20))` - Captures flow and capacity.
 2.  **MOM60**: `$close / Ref($close, 60) - 1` - Medium-term Momentum.
@@ -111,6 +113,8 @@ The strategy utilizes a **Custom Hybrid Factor Model** composed of 7 robust fact
 8.  **BB_Width_Norm**: Normalized Bollinger Band Width (Volatility).
 9.  **KC_Width_Norm**: Normalized Keltner Channel Width (True Range Volatility).
 10. **Squeeze_Ratio**: Ratio of BB Width to KC Width (Detects volatility squeeze/expansion regimes).
+11. **Trend_Momentum**: `Mean($close, 10) * Slope($close, 10)` - Trend strength indicator.
+12. **Vol_Breakout**: Volatility breakout proxy combining log(MAHIGH10)² with upper band.
 
 **Optimization Technique**:
 -   **Preprocessing**: Cross-Sectional Z-Score Feature Neutralization.
