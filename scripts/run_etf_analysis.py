@@ -1,4 +1,5 @@
 import argparse
+import pandas as pd
 import qlib
 import sys
 import os
@@ -237,6 +238,33 @@ def main() -> None:
             market_regime=market_regime,
             vol_feature=vol_feature
         )
+        
+        # Log key backtest metrics to MLflow
+        # Log key backtest metrics to MLflow
+        try:
+            from qlib.contrib.evaluate import risk_analysis
+            # Ensure report is a DataFrame and has 'return'
+            if isinstance(report, pd.DataFrame) and 'return' in report.columns:
+                risk_df = risk_analysis(report['return'])
+                sharpe = risk_df.loc['sharpe', 'risk'] if 'sharpe' in risk_df.index else None
+                if sharpe is None:
+                     # Fallback for different Qlib versions
+                     sharpe = risk_df.loc['information_ratio', 'risk'] if 'information_ratio' in risk_df.index else None
+                
+                # Calculate Rank IC from predictions
+                from delorean.utils import calculate_rank_ic
+                labels = dataset.prepare("test", col_set="label", data_key="infer")
+                rank_ic = calculate_rank_ic(pred, labels)
+                
+                if sharpe is not None:
+                    R.log_metrics(sharpe=float(sharpe))
+                if rank_ic is not None:
+                    R.log_metrics(rank_ic=float(rank_ic))
+                print(f"Logged metrics to MLflow: sharpe={sharpe}, rank_ic={rank_ic}")
+            else:
+                print("Warning: Report format invalid for metric logging")
+        except Exception as e:
+            print(f"Warning: Could not log metrics to MLflow: {e}")
         
         # 5. Experiment Logging
         exp_manager = ExperimentManager()

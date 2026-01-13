@@ -12,13 +12,6 @@ export default function Experiments() {
 
     return (
         <div style={{ padding: '20px', maxWidth: '1400px', margin: '0 auto' }}>
-            {/* Breadcrumb */}
-            <div style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <Link href="/" style={{ color: '#58a6ff', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                    <ArrowLeft size={16} /> Dashboard
-                </Link>
-            </div>
-
             <h1 style={{ marginBottom: '30px', borderBottom: '1px solid #30363d', paddingBottom: '10px' }}>
                 Experiments & Backtest Results
             </h1>
