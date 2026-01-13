@@ -11,6 +11,7 @@ from delorean.config import QLIB_PROVIDER_URI, QLIB_REGION, ETF_LIST
 from delorean.data import ETFDataLoader
 from delorean.model import ModelTrainer
 from delorean.backtest import BacktestEngine
+from delorean.utils import smooth_predictions, calculate_rank_ic
 from qlib.contrib.evaluate import risk_analysis
 
 def run_investigation():
@@ -63,22 +64,8 @@ def run_investigation():
     for window in windows:
         print(f"\n  >>> Testing Smooth Window = {window} ...")
         
-        # Apply EWMA Smoothing
-        if pred_test.index.names[1] == 'instrument':
-            level_name = 'instrument'
-        else:
-            level_name = pred_test.index.names[1]
-            
-        pred_smooth = pred_test.groupby(level=level_name).apply(
-            lambda x: x.ewm(halflife=window, min_periods=1).mean()
-        )
-        
-        # Clean Index
-        if pred_smooth.index.nlevels > 2:
-            pred_smooth = pred_smooth.droplevel(0)
-        if pred_smooth.index.names[0] != 'datetime' and 'datetime' in pred_smooth.index.names:
-                pred_smooth = pred_smooth.swaplevel()
-        pred_smooth = pred_smooth.dropna().sort_index()
+        # Apply EWMA Smoothing using centralized utility
+        pred_smooth = smooth_predictions(pred_test, halflife=window)
 
         # Run Backtest
         engine = BacktestEngine(pred_smooth)
@@ -100,14 +87,10 @@ def run_investigation():
             sharpe = risks.loc["information_ratio", "risk"]
             mdd = risks.loc["max_drawdown", "risk"]
             
-            # Rank IC
-            # Align prediction & label
+            # Rank IC using centralized utility
             df_test_all = dataset.prepare("test", col_set=["label"])
             y_test = df_test_all["label"]
-            
-            # Ensure indices match for IC calc
-            common_idx = pred_smooth.index.intersection(y_test.index)
-            ic = pred_smooth.loc[common_idx].corr(y_test.loc[common_idx].iloc[:, 0], method="spearman")
+            ic = calculate_rank_ic(pred_smooth, y_test.iloc[:, 0])
 
             print(f"      [Result] Sharpe: {sharpe:.4f}, Ann. Ret: {ret_annual:.4f}, MDD: {mdd:.4f}, Rank IC: {ic:.4f}")
             

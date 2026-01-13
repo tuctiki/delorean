@@ -8,25 +8,10 @@ from .strategy.portfolio import PortfolioOptimizer
 from .strategy.execution import ExecutionModel
 import pandas as pd
 import copy
-
-class SimpleTopkStrategy(BaseSignalStrategy):
-    """
-    A simplified TopK strategy that aims to reduce turnover.
-    
-    Logic:
-    1. Selects Top K stocks based on prediction scores.
-    2. Only swaps stocks if they fall out of the Top K (implicit in rebalancing).
-    3. Rebalances strictly to target weights (Equal Weight) daily.
-    
-    Attributes:
-        topk (int): Number of stocks to hold.
-        risk_degree (float): Percentage of total capital to invest (e.g., 0.95).
-    """
-    def __init__(self, topk: int = 3, risk_degree: float = 0.95, **kwargs: Any):
-        super().__init__(risk_degree=risk_degree, **kwargs)
-        self.topk = topk
-
 import random
+import logging
+
+logger = logging.getLogger(__name__)
 
 class SimpleTopkStrategy(BaseSignalStrategy):
     """
@@ -66,7 +51,8 @@ class SimpleTopkStrategy(BaseSignalStrategy):
         if self.market_regime is not None:
              try:
                 is_bull = self.market_regime.loc[trade_start_time] if trade_start_time in self.market_regime.index else True
-             except:
+             except Exception as e:
+                logger.debug(f"Market regime lookup failed for {trade_start_time}: {e}")
                 is_bull = True
              
              if not is_bull:
@@ -102,7 +88,7 @@ class SimpleTopkStrategy(BaseSignalStrategy):
                          valid_mask = trends_aligned > 1.0
                          pred_score = pred_score.loc[common[valid_mask]]         
             except Exception as e:
-                pass 
+                logger.debug(f"Trend filter failed for {trade_start_time}: {e}")
 
         # 4. Portfolio Optimization (Target Weights)
         # Sort and take top K candidates for weighting

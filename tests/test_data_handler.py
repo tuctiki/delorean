@@ -1,5 +1,6 @@
 import pytest
 import pandas as pd
+import numpy as np
 from delorean.data import ETFDataHandler
 
 def test_custom_factors_structure():
@@ -11,8 +12,32 @@ def test_custom_factors_structure():
     assert len(exprs) == len(names)
     assert "VOL20" in names
     
-def test_handler_init_structure():
-    """Test that handler initialization sets up config correctly."""
-    # Mocking Qlib init is hard without mocking the whole library, 
-    # so we test the static method and class attributes for now.
-    pass
+def test_custom_factors_contains_expected_factors():
+    """Test that all expected factor names are present."""
+    _, names = ETFDataHandler.get_custom_factors()
+    
+    expected_factors = [
+        "MarketCap_Liquidity",
+        "MOM60",
+        "MOM120", 
+        "REV5",
+        "VOL20",
+        "VOL60",
+        "VOL120",
+        "BB_Width_Norm",
+        "KC_Width_Norm",
+        "Squeeze_Ratio",
+    ]
+    
+    for factor in expected_factors:
+        assert factor in names, f"Expected factor {factor} not found in custom factors"
+
+def test_custom_factors_expressions_are_valid_strings():
+    """Test that all expressions are non-empty strings."""
+    exprs, _ = ETFDataHandler.get_custom_factors()
+    
+    for expr in exprs:
+        assert isinstance(expr, str)
+        assert len(expr) > 0
+        # Basic sanity check - should contain $ for Qlib field references
+        assert "$" in expr, f"Expression '{expr}' doesn't appear to use Qlib field syntax"
