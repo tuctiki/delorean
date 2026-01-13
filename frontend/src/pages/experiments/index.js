@@ -105,7 +105,7 @@ export default function Experiments() {
                 padding: '20px'
             }}>
                 <h2 style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
-                    <Layers size={22} color="#d2a8ff" /> Experiment History
+                    <Layers size={22} color="#d2a8ff" /> Run History
                 </h2>
 
                 {expError ? (
@@ -113,13 +113,13 @@ export default function Experiments() {
                 ) : !experiments ? (
                     <div style={{ padding: '20px', textAlign: 'center', color: '#8b949e' }}>Loading...</div>
                 ) : experiments.length === 0 ? (
-                    <div style={{ padding: '20px', textAlign: 'center', color: '#8b949e' }}>No experiments found in mlruns/</div>
+                    <div style={{ padding: '20px', textAlign: 'center', color: '#8b949e' }}>No runs found. Run a backtest to start tracking.</div>
                 ) : (
                     <div style={{ overflowX: 'auto' }}>
                         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
                             <thead>
                                 <tr style={{ color: '#8b949e', textAlign: 'left', borderBottom: '1px solid #30363d' }}>
-                                    <th style={{ padding: '12px 8px' }}>ID</th>
+                                    <th style={{ padding: '12px 8px' }}>Run ID</th>
                                     <th style={{ padding: '12px 8px' }}>Name</th>
                                     <th style={{ padding: '12px 8px', textAlign: 'right' }}>Sharpe</th>
                                     <th style={{ padding: '12px 8px', textAlign: 'right' }}>Rank IC</th>

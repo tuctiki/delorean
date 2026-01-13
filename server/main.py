@@ -121,64 +121,90 @@ def get_recommendations():
 
 @app.get("/api/experiments")
 def list_experiments():
+    """
+    List all runs from the default experiment (ETF_Strategy).
+    Returns a flat list of runs with their params and metrics.
+    """
+    from delorean.config import DEFAULT_EXPERIMENT_NAME
+    
     try:
-        experiments = []
+        runs = []
         root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         mlruns_path = os.path.join(root, "mlruns")
         
-        if os.path.exists(mlruns_path):
-            for d in os.listdir(mlruns_path):
-                full_path = os.path.join(mlruns_path, d)
-                if os.path.isdir(full_path) and d.isdigit():
-                    # Get creation time
-                    creation_time = os.path.getmtime(full_path)
-                    creation_str = pd.Timestamp(creation_time, unit='s').strftime('%Y-%m-%d %H:%M:%S')
-                    
-                    # Read meta.yaml for experiment name
-                    exp_name = f"Experiment {d}"
-                    meta_path = os.path.join(full_path, "meta.yaml")
-                    if os.path.exists(meta_path):
-                        try:
-                            with open(meta_path, "r") as f:
-                                for line in f:
-                                    if line.strip().startswith("name:"):
-                                        exp_name = line.split(":", 1)[1].strip()
-                                        break
-                        except: pass
-                    
-                    # [NEW] Read metrics from latest run
-                    metrics = {}
-                    runs = [r for r in os.listdir(full_path) if os.path.isdir(os.path.join(full_path, r)) and len(r) > 20]
-                    if runs:
-                        runs.sort(key=lambda x: os.path.getmtime(os.path.join(full_path, x)), reverse=True)
-                        latest_run = runs[0]
-                        metrics_path = os.path.join(full_path, latest_run, "metrics")
-                        if os.path.exists(metrics_path):
-                            for mf in os.listdir(metrics_path):
-                                try:
-                                    with open(os.path.join(metrics_path, mf), "r") as f:
-                                        # MLflow format: timestamp value step
-                                        parts = f.read().strip().split()
-                                        if len(parts) >= 2:
-                                            val = float(parts[1])
-                                            # JSON does not support NaN/Inf
-                                            if math.isnan(val) or math.isinf(val):
-                                                val = None 
-                                            metrics[mf] = val
-                                except: pass
-                    
-                    experiments.append({
-                        "id": d, 
-                        "name": exp_name, 
-                        "artifact_location": full_path,
-                        "creation_time": creation_str,
-                        "timestamp": creation_time,
-                        "metrics": metrics
-                    })
+        if not os.path.exists(mlruns_path):
+            return []
         
-        # Sort by Timestamp Descending
-        experiments.sort(key=lambda x: x["timestamp"], reverse=True)
-        return experiments
+        # Find the default experiment folder by reading meta.yaml files
+        default_exp_path = None
+        for d in os.listdir(mlruns_path):
+            full_path = os.path.join(mlruns_path, d)
+            if os.path.isdir(full_path) and d.isdigit():
+                meta_path = os.path.join(full_path, "meta.yaml")
+                if os.path.exists(meta_path):
+                    try:
+                        with open(meta_path, "r") as f:
+                            for line in f:
+                                if line.strip().startswith("name:"):
+                                    exp_name = line.split(":", 1)[1].strip()
+                                    if exp_name == DEFAULT_EXPERIMENT_NAME:
+                                        default_exp_path = full_path
+                                        break
+                    except: pass
+                if default_exp_path:
+                    break
+        
+        if not default_exp_path:
+            return []  # Default experiment not found
+        
+        # List all runs inside the default experiment
+        for run_id in os.listdir(default_exp_path):
+            run_path = os.path.join(default_exp_path, run_id)
+            if not os.path.isdir(run_path) or len(run_id) < 20:
+                continue  # Skip meta.yaml and other non-run files
+            
+            # Get creation time
+            creation_time = os.path.getmtime(run_path)
+            creation_str = pd.Timestamp(creation_time, unit='s').strftime('%Y-%m-%d %H:%M:%S')
+            
+            # Read Params
+            params = {}
+            params_path = os.path.join(run_path, "params")
+            if os.path.exists(params_path):
+                for pf in os.listdir(params_path):
+                    try:
+                        with open(os.path.join(params_path, pf), "r") as f:
+                            params[pf] = f.read().strip()
+                    except: pass
+            
+            # Read Metrics
+            metrics = {}
+            metrics_path = os.path.join(run_path, "metrics")
+            if os.path.exists(metrics_path):
+                for mf in os.listdir(metrics_path):
+                    try:
+                        with open(os.path.join(metrics_path, mf), "r") as f:
+                            parts = f.read().strip().split()
+                            if len(parts) >= 2:
+                                val = float(parts[1])
+                                if math.isnan(val) or math.isinf(val):
+                                    val = None
+                                metrics[mf] = val
+                    except: pass
+            
+            runs.append({
+                "id": run_id,
+                "name": f"Run {creation_str}",  # Human-readable name
+                "artifact_location": run_path,
+                "creation_time": creation_str,
+                "timestamp": creation_time,
+                "params": params,
+                "metrics": metrics
+            })
+        
+        # Sort by Timestamp Descending (newest first)
+        runs.sort(key=lambda x: x["timestamp"], reverse=True)
+        return runs
     except Exception as e:
         import traceback
         return [{"id": "error", "name": f"Error: {str(e)}", "timestamp": 0, "metrics": {}, "creation_time": traceback.format_exc()}]

@@ -48,6 +48,9 @@ TEST_START_TIME = "2023-01-01"
 QLIB_PROVIDER_URI = '~/.qlib/qlib_data/cn_etf_data'
 QLIB_REGION = REG_CN
 
+# MLflow Config
+DEFAULT_EXPERIMENT_NAME = "ETF_Strategy"
+
 # Output Config
 import os
 OUTPUT_DIR = "artifacts"

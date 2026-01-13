@@ -97,7 +97,16 @@ python scripts/run_etf_analysis.py \
 -   `--risk_parity`: Enable Volatility Targeting (Optional, 1/Vol weighting).
 -   `--start_time / --end_time`: Data range overrides.
 -   `--train_end_time / --test_start_time`: Split configuration.
--   `--experiment_name <str>`: Custom name for MLflow experiment (default: "ETF_Strategy_Refactored").
+-   `--experiment_name <str>`: *(Deprecated)* All runs now log to default experiment `ETF_Strategy`.
+
+### 4. MLflow UI (Experiment Management)
+
+For detailed experiment management, comparisons, and artifact viewing:
+
+```bash
+conda run -n quant mlflow ui --backend-store-uri mlruns/ --port 5000
+```
+Access at `http://localhost:5000`.
 
 ## Implementation Details
 
@@ -141,8 +150,9 @@ The strategy now supports advanced position sizing:
 -   **Dynamic Market Exposure**: Adjusts equity exposure (0% - 99%) based on the Benchmark Trend Strength (Close vs MA60) with **Hysteresis** to prevent whipsaws.
 
 ### Experiment Tracking
-All runs are logged to `mlruns/`, viewable via the Dashboard.
--   **Experiment Details Page**: Includes Cumulative Return and Excess Return plots.
+All backtest runs are logged to the default experiment `ETF_Strategy` in `mlruns/`.
+-   **Dashboard**: View Run History at `http://localhost:3000/experiments`.
+-   **MLflow UI**: For advanced comparison and artifact browsing, run `mlflow ui --port 5000`.
 
 ### Performance (Stress Test: 2022-Present)
 | Metric | Result (Train 2015-2021) |

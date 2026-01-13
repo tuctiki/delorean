@@ -5,7 +5,7 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from delorean.config import QLIB_PROVIDER_URI, QLIB_REGION, BENCHMARK, START_TIME, END_TIME
+from delorean.config import QLIB_PROVIDER_URI, QLIB_REGION, BENCHMARK, START_TIME, END_TIME, DEFAULT_EXPERIMENT_NAME
 from delorean.data import ETFDataLoader
 from delorean.model import ModelTrainer
 from delorean.backtest import BacktestEngine
@@ -105,17 +105,8 @@ def main() -> None:
     model_trainer = ModelTrainer(seed=args.seed)
     
     # Using Recorder for experiment tracking
-    # Using Recorder for experiment tracking
-    if args.use_hybrid:
-        exp_name = "ETF_Strategy_Hybrid"
-    elif args.use_alpha158:
-        exp_name = "ETF_Strategy_Alpha158"
-    else:
-        exp_name = "ETF_Strategy_Refactored"
-
-    if args.experiment_name:
-        exp_name = args.experiment_name
-        print(f"Using Custom Experiment Name: {exp_name}")
+    # Always use the default experiment name for consistent tracking
+    exp_name = DEFAULT_EXPERIMENT_NAME
         
     with R.start(experiment_name=exp_name) as recorder:
         # Log all arguments as experiment parameters
