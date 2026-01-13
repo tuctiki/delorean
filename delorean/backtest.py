@@ -57,7 +57,28 @@ class SimpleTopkStrategy(BaseSignalStrategy):
              
              if not is_bull:
                  # Standard Regime Filter: Sell All (Cash)
-                 return TradeDecisionWO(self._generate_sell_orders(self.trade_position, pd.Index([]), trade_start_time, trade_end_time), self)
+                 # Generate sell orders for all holdings
+                 sell_order_list = []
+                 current_stock_list = self.trade_position.get_stock_list()
+                 for code in current_stock_list:
+                     if not self.trade_exchange.is_stock_tradable(
+                         stock_id=code,
+                         start_time=trade_start_time,
+                         end_time=trade_end_time,
+                         direction=OrderDir.SELL,
+                     ):
+                         continue
+                     sell_amount = self.trade_position.get_stock_amount(code=code)
+                     sell_order = Order(
+                         stock_id=code,
+                         amount=sell_amount,
+                         start_time=trade_start_time,
+                         end_time=trade_end_time,
+                         direction=Order.SELL,
+                     )
+                     if self.trade_exchange.check_order(sell_order):
+                         sell_order_list.append(sell_order)
+                 return TradeDecisionWO(sell_order_list, self)
         
         # 0.5 Turnover control: Probabilistic Retention (Pre-check)
         # Note: Ideally this should move to ExecutionModel too, but it short-circuits everything.

@@ -235,8 +235,7 @@ def main() -> None:
             n_drop=strategy_params["n_drop"], 
             buffer=strategy_params["buffer"],
             market_regime=market_regime,
-            vol_feature=vol_feature,
-            bench_feature=exposure_bench_feature
+            vol_feature=vol_feature
         )
         
         # 5. Experiment Logging
