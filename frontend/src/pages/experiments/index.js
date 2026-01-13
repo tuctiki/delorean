@@ -1,38 +1,174 @@
 import useSWR from 'swr';
-import { Layers, FileText } from 'lucide-react';
+import Link from 'next/link';
+import { Layers, FileText, TrendingUp, ArrowLeft } from 'lucide-react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import styles from '../../styles/Experiments.module.css';
 
 const fetcher = (...args) => fetch(...args).then(res => res.json());
 
 export default function Experiments() {
-    const { data: experiments, error } = useSWR('http://localhost:8000/api/experiments', fetcher);
+    const { data: experiments, error: expError } = useSWR('http://localhost:8000/api/experiments', fetcher);
+    const { data: results, error: resultsError } = useSWR('http://localhost:8000/api/experiment_results', fetcher);
 
     return (
-        <div className={styles.container}>
-            <h1 className={styles.title}>Experiments</h1>
+        <div style={{ padding: '20px', maxWidth: '1400px', margin: '0 auto' }}>
+            {/* Breadcrumb */}
+            <div style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Link href="/" style={{ color: '#58a6ff', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <ArrowLeft size={16} /> Dashboard
+                </Link>
+            </div>
 
-            <div className={styles.list}>
-                {experiments?.map(exp => (
-                    <div key={exp.id} className={styles.item}>
-                        <div className={styles.icon}>
-                            <Layers size={24} />
+            <h1 style={{ marginBottom: '30px', borderBottom: '1px solid #30363d', paddingBottom: '10px' }}>
+                Experiments & Backtest Results
+            </h1>
+
+            {/* Section 1: Latest Backtest Results */}
+            <div style={{
+                background: '#0d1117',
+                border: '1px solid #30363d',
+                borderRadius: '8px',
+                padding: '20px',
+                marginBottom: '30px'
+            }}>
+                <h2 style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+                    <TrendingUp size={22} color="#58a6ff" /> Latest Backtest Performance
+                </h2>
+
+                {results && Object.keys(results).length > 0 ? (
+                    <>
+                        <div style={{ fontSize: '0.9rem', color: '#8b949e', marginBottom: '20px' }}>
+                            {results.description || 'Strategy Performance'} • Period: {results.period || 'N/A'}
                         </div>
-                        <div className={styles.content}>
-                            <h3>Experiment #{exp.id}</h3>
-                            <p className={styles.path} style={{ fontSize: '0.8rem', color: '#58a6ff', marginTop: '4px' }}>
-                                Generated: {exp.creation_time}
-                            </p>
-                            <p className={styles.path}>{exp.artifact_location}</p>
+
+                        {/* Metrics Grid */}
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '15px', marginBottom: '25px' }}>
+                            <div style={{ background: '#161b22', padding: '15px', borderRadius: '6px', textAlign: 'center' }}>
+                                <div style={{ fontSize: '0.85rem', color: '#8b949e', marginBottom: '5px' }}>Sharpe Ratio</div>
+                                <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#58a6ff' }}>
+                                    {results.sharpe?.toFixed(2) || '-'}
+                                </div>
+                            </div>
+                            <div style={{ background: '#161b22', padding: '15px', borderRadius: '6px', textAlign: 'center' }}>
+                                <div style={{ fontSize: '0.85rem', color: '#8b949e', marginBottom: '5px' }}>Ann. Return</div>
+                                <div style={{ fontSize: '1.5rem', fontWeight: 700, color: results.annualized_return > 0 ? '#2ecc71' : '#e74c3c' }}>
+                                    {results.annualized_return ? `${(results.annualized_return * 100).toFixed(1)}%` : '-'}
+                                </div>
+                            </div>
+                            <div style={{ background: '#161b22', padding: '15px', borderRadius: '6px', textAlign: 'center' }}>
+                                <div style={{ fontSize: '0.85rem', color: '#8b949e', marginBottom: '5px' }}>Max Drawdown</div>
+                                <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#e74c3c' }}>
+                                    {results.max_drawdown ? `${(results.max_drawdown * 100).toFixed(1)}%` : '-'}
+                                </div>
+                            </div>
+                            <div style={{ background: '#161b22', padding: '15px', borderRadius: '6px', textAlign: 'center' }}>
+                                <div style={{ fontSize: '0.85rem', color: '#8b949e', marginBottom: '5px' }}>Win Rate</div>
+                                <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#c9d1d9' }}>
+                                    {results.win_rate ? `${(results.win_rate * 100).toFixed(1)}%` : '-'}
+                                </div>
+                            </div>
                         </div>
-                        <div className={styles.actions}>
-                            <a href={`/experiments/${exp.id}`}>
-                                <button className={styles.viewBtn}><FileText size={16} /> Details</button>
-                            </a>
-                        </div>
+
+                        {/* Chart */}
+                        {results.chart_data && results.chart_data.length > 0 && (
+                            <div style={{ height: '350px', width: '100%' }}>
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <LineChart data={results.chart_data}>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="#30363d" />
+                                        <XAxis
+                                            dataKey="date"
+                                            stroke="#8b949e"
+                                            tick={{ fill: '#8b949e', fontSize: 11 }}
+                                            tickFormatter={(str) => str?.substring(0, 7) || ''}
+                                            minTickGap={50}
+                                        />
+                                        <YAxis
+                                            stroke="#8b949e"
+                                            tick={{ fill: '#8b949e', fontSize: 11 }}
+                                            domain={['auto', 'auto']}
+                                        />
+                                        <Tooltip
+                                            contentStyle={{ backgroundColor: '#0d1117', border: '1px solid #30363d', color: '#c9d1d9' }}
+                                            labelStyle={{ color: '#8b949e' }}
+                                        />
+                                        <Legend />
+                                        <Line type="monotone" dataKey="strategy" name="Strategy" stroke="#58a6ff" dot={false} strokeWidth={2} />
+                                        <Line type="monotone" dataKey="benchmark" name="Benchmark (HS300)" stroke="#8b949e" dot={false} strokeWidth={1} strokeDasharray="5 5" />
+                                    </LineChart>
+                                </ResponsiveContainer>
+                            </div>
+                        )}
+                    </>
+                ) : (
+                    <div style={{ padding: '40px', textAlign: 'center', color: '#8b949e' }}>
+                        {resultsError ? 'Error loading backtest results' : 'No backtest results available. Run a backtest to see performance.'}
                     </div>
-                ))}
-                {experiments && experiments.length === 0 && <div className={styles.empty}>No experiments found in mlruns.</div>}
-                {(!experiments && !error) && <div className={styles.loading}>Loading...</div>}
+                )}
+            </div>
+
+            {/* Section 2: Experiment History */}
+            <div style={{
+                background: '#0d1117',
+                border: '1px solid #30363d',
+                borderRadius: '8px',
+                padding: '20px'
+            }}>
+                <h2 style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+                    <Layers size={22} color="#d2a8ff" /> Experiment History
+                </h2>
+
+                {expError ? (
+                    <div style={{ padding: '20px', textAlign: 'center', color: '#e74c3c' }}>Error loading experiments</div>
+                ) : !experiments ? (
+                    <div style={{ padding: '20px', textAlign: 'center', color: '#8b949e' }}>Loading...</div>
+                ) : experiments.length === 0 ? (
+                    <div style={{ padding: '20px', textAlign: 'center', color: '#8b949e' }}>No experiments found in mlruns/</div>
+                ) : (
+                    <div style={{ overflowX: 'auto' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
+                            <thead>
+                                <tr style={{ color: '#8b949e', textAlign: 'left', borderBottom: '1px solid #30363d' }}>
+                                    <th style={{ padding: '12px 8px' }}>ID</th>
+                                    <th style={{ padding: '12px 8px' }}>Name</th>
+                                    <th style={{ padding: '12px 8px', textAlign: 'right' }}>Sharpe</th>
+                                    <th style={{ padding: '12px 8px', textAlign: 'right' }}>Rank IC</th>
+                                    <th style={{ padding: '12px 8px' }}>Created</th>
+                                    <th style={{ padding: '12px 8px', textAlign: 'right' }}>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {experiments.map((exp) => (
+                                    <tr key={exp.id} style={{ borderBottom: '1px solid #21262d' }}>
+                                        <td style={{ padding: '12px 8px', color: '#58a6ff', fontWeight: 600 }}>#{exp.id}</td>
+                                        <td style={{ padding: '12px 8px', color: '#c9d1d9' }}>{exp.name}</td>
+                                        <td style={{ padding: '12px 8px', textAlign: 'right', fontFamily: 'monospace', color: exp.metrics?.sharpe > 0 ? '#2ecc71' : '#e74c3c' }}>
+                                            {exp.metrics?.sharpe !== undefined ? exp.metrics.sharpe.toFixed(3) : '-'}
+                                        </td>
+                                        <td style={{ padding: '12px 8px', textAlign: 'right', fontFamily: 'monospace', color: exp.metrics?.rank_ic > 0.02 ? '#2ecc71' : '#f1c40f' }}>
+                                            {exp.metrics?.rank_ic !== undefined ? exp.metrics.rank_ic.toFixed(4) : '-'}
+                                        </td>
+                                        <td style={{ padding: '12px 8px', color: '#8b949e', fontSize: '0.85rem' }}>{exp.creation_time}</td>
+                                        <td style={{ padding: '12px 8px', textAlign: 'right' }}>
+                                            <Link href={`/experiments/${exp.id}`} style={{
+                                                color: '#58a6ff',
+                                                textDecoration: 'none',
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: '5px',
+                                                padding: '4px 10px',
+                                                border: '1px solid #30363d',
+                                                borderRadius: '4px',
+                                                fontSize: '0.85rem'
+                                            }}>
+                                                <FileText size={14} /> Details
+                                            </Link>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
             </div>
         </div>
     );

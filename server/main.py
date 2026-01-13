@@ -120,7 +120,7 @@ def get_recommendations():
 
 @app.get("/api/experiments")
 def list_experiments():
-    # Only if mlruns exists
+    """List all experiments with summary metrics from latest run."""
     experiments = []
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     mlruns_path = os.path.join(root, "mlruns")
@@ -129,32 +129,49 @@ def list_experiments():
         for d in os.listdir(mlruns_path):
             full_path = os.path.join(mlruns_path, d)
             if os.path.isdir(full_path) and d.isdigit():
-                 # Get creation time (using mtime as proxy for folder creation/update)
-                 # Better to check meta.yaml mtime if exists
-                 creation_time = os.path.getmtime(full_path)
-                 creation_str = pd.Timestamp(creation_time, unit='s').strftime('%Y-%m-%d %H:%M:%S')
+                # Get creation time
+                creation_time = os.path.getmtime(full_path)
+                creation_str = pd.Timestamp(creation_time, unit='s').strftime('%Y-%m-%d %H:%M:%S')
                  
-                 # [NEW] Try to read meta.yaml for real name
-                 exp_name = f"Experiment {d}"
-                 meta_path = os.path.join(full_path, "meta.yaml")
-                 if os.path.exists(meta_path):
-                     try:
-                         with open(meta_path, "r") as f:
-                             for line in f:
-                                 if line.strip().startswith("name:"):
-                                     exp_name = line.split(":", 1)[1].strip()
-                                     break
-                     except: pass
+                # Read meta.yaml for experiment name
+                exp_name = f"Experiment {d}"
+                meta_path = os.path.join(full_path, "meta.yaml")
+                if os.path.exists(meta_path):
+                    try:
+                        with open(meta_path, "r") as f:
+                            for line in f:
+                                if line.strip().startswith("name:"):
+                                    exp_name = line.split(":", 1)[1].strip()
+                                    break
+                    except: pass
+                
+                # [NEW] Read metrics from latest run
+                metrics = {}
+                runs = [r for r in os.listdir(full_path) if os.path.isdir(os.path.join(full_path, r)) and len(r) > 20]
+                if runs:
+                    runs.sort(key=lambda x: os.path.getmtime(os.path.join(full_path, x)), reverse=True)
+                    latest_run = runs[0]
+                    metrics_path = os.path.join(full_path, latest_run, "metrics")
+                    if os.path.exists(metrics_path):
+                        for mf in os.listdir(metrics_path):
+                            try:
+                                with open(os.path.join(metrics_path, mf), "r") as f:
+                                    # MLflow format: timestamp value step
+                                    parts = f.read().strip().split()
+                                    if len(parts) >= 2:
+                                        metrics[mf] = float(parts[1])  # Value is second column
+                            except: pass
                  
-                 experiments.append({
-                     "id": d, 
-                     "name": exp_name, 
-                     "artifact_location": full_path,
-                     "creation_time": creation_str,
-                     "timestamp": creation_time
-                 })
-    # Sort by Timestamp Descending (Reverse Order)
-    # Sort by Timestamp Descending (Reverse Order)
+                experiments.append({
+                    "id": d, 
+                    "name": exp_name, 
+                    "artifact_location": full_path,
+                    "creation_time": creation_str,
+                    "timestamp": creation_time,
+                    "metrics": metrics
+                })
+    
+    # Sort by Timestamp Descending
     experiments.sort(key=lambda x: x["timestamp"], reverse=True)
     return experiments
 
