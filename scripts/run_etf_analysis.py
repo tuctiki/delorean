@@ -34,6 +34,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--train_end_time", type=str, default=None, help="Training End Time (e.g. 2021-12-31)")
     parser.add_argument("--test_start_time", type=str, default=None, help="Test Start Time (e.g. 2022-01-01)")
     parser.add_argument("--end_time", type=str, default=None, help="Backtest End Time (e.g. 2025-12-31)")
+    parser.add_argument("--experiment_name", type=str, default=None, help="Custom MLflow Experiment Name")
     
     return parser.parse_args()
 
@@ -102,6 +103,10 @@ def main() -> None:
         exp_name = "ETF_Strategy_Alpha158"
     else:
         exp_name = "ETF_Strategy_Refactored"
+
+    if args.experiment_name:
+        exp_name = args.experiment_name
+        print(f"Using Custom Experiment Name: {exp_name}")
         
     with R.start(experiment_name=exp_name) as recorder:
         # Log all arguments as experiment parameters

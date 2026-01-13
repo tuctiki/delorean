@@ -12,9 +12,7 @@ export default function Experiments() {
 
     return (
         <div style={{ padding: '20px', maxWidth: '1400px', margin: '0 auto' }}>
-            <h1 style={{ marginBottom: '30px', borderBottom: '1px solid #30363d', paddingBottom: '10px' }}>
-                Experiments & Backtest Results
-            </h1>
+            {/* Header Removed as per user request */}
 
             {/* Section 1: Latest Backtest Results */}
             <div style={{
@@ -140,7 +138,9 @@ export default function Experiments() {
                                         <td style={{ padding: '12px 8px', textAlign: 'right', fontFamily: 'monospace', color: exp.metrics?.rank_ic > 0.02 ? '#2ecc71' : '#f1c40f' }}>
                                             {exp.metrics?.rank_ic !== undefined ? exp.metrics.rank_ic.toFixed(4) : '-'}
                                         </td>
-                                        <td style={{ padding: '12px 8px', color: '#8b949e', fontSize: '0.85rem' }}>{exp.creation_time}</td>
+                                        <td style={{ padding: '12px 8px', color: '#8b949e', fontSize: '0.85rem' }}>
+                                            {exp.timestamp ? new Date(exp.timestamp * 1000).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false }) : '-'}
+                                        </td>
                                         <td style={{ padding: '12px 8px', textAlign: 'right' }}>
                                             <Link href={`/experiments/${exp.id}`} style={{
                                                 color: '#58a6ff',
