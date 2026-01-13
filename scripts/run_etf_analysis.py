@@ -72,6 +72,15 @@ def main() -> None:
     start_time = args.start_time if args.start_time else START_TIME
     end_time = args.end_time if args.end_time else END_TIME
 
+    # [FIX] Clean up existing artifacts to prevent logging stale plots
+    print("Cleaning up old artifacts...")
+    plots = ["cumulative_return.png", "excess_return.png", "factor_ic.png", "feature_correlation.png"]
+    for p in plots:
+        p_path = os.path.join("artifacts", p)
+        if os.path.exists(p_path):
+            os.remove(p_path)
+
+
     # 2. Data Loading
     data_loader = ETFDataLoader(
         use_alpha158=args.use_alpha158, 
@@ -198,6 +207,32 @@ def main() -> None:
         # Define Regime: True = Bull (Close > MA60), False = Bear (Close <= MA60)
         market_regime = bench_close['close'] > bench_close['ma60']
         
+        # [FIX] Enforce Test Range Slicing
+        # Ensure backtest only runs on the requested test period
+        test_start = args.test_start_time if args.test_start_time else START_TIME
+        test_end = args.end_time if args.end_time else END_TIME
+        
+        print(f"Enforcing Backtest Range: {test_start} to {test_end}")
+        
+        # Pred index is (datetime, instrument), sorted. Slicing logic:
+        try:
+            # Flexible date parsing
+            ts_start = pd.Timestamp(test_start)
+            ts_end = pd.Timestamp(test_end)
+            
+            # Cap end time at data availability to avoid IndexErrors in Qlib
+            max_data_date = pred.index.get_level_values('datetime').max()
+            if ts_end > max_data_date:
+                print(f"Requested end time {ts_end} exceeds data availability ({max_data_date}). Capping to max data date.")
+                ts_end = max_data_date
+                # Update test_end string for consistency if passed to run()
+                test_end = ts_end.strftime('%Y-%m-%d')
+                
+            pred = pred.loc[ts_start:ts_end]
+            print(f"Predictions sliced. New shape: {pred.shape}")
+        except Exception as e:
+            print(f"Warning: Failed to slice predictions by date: {e}")
+
         # 4. Backtest
         backtest_engine = BacktestEngine(pred)
         
@@ -241,7 +276,9 @@ def main() -> None:
             n_drop=strategy_params["n_drop"], 
             buffer=strategy_params["buffer"],
             market_regime=market_regime,
-            vol_feature=vol_feature
+            vol_feature=vol_feature,
+            start_time=test_start,
+            end_time=None # Let Engine determine safe end date from sliced pred
         )
         
         # Log key backtest metrics to MLflow
@@ -280,6 +317,10 @@ def main() -> None:
         )
         exp_manager.save_report(report, positions)
         
+        # 6. Analysis (Generate Plots FIRST)
+        analyzer = ResultAnalyzer()
+        analyzer.process(report, positions)
+        
         # Log Plots as Artifacts (explicitly)
         # Note: These are saved by ResultAnalyzer into OUTPUT_DIR (artifacts/)
         # We need to log them to the recorder for MLflow tracking
@@ -291,9 +332,6 @@ def main() -> None:
 
         # 6. Analysis
 
-        # 6. Analysis
-        analyzer = ResultAnalyzer()
-        analyzer.process(report, positions)
 
 if __name__ == "__main__":
     main()

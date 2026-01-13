@@ -94,6 +94,29 @@ class ResultAnalyzer:
             plt.savefig(os.path.join(OUTPUT_DIR, "excess_return.png"))
             print(f"Saved plot: {os.path.join(OUTPUT_DIR, 'excess_return.png')}")
 
+            # [NEW] Save Metrics JSON for Dashboard
+            import json
+            import datetime
+            import math
+            
+            def sanitize(val):
+                if isinstance(val, float) and (math.isnan(val) or math.isinf(val)):
+                    return None
+                return val
+            
+            results = {
+                "annual_return": sanitize(float(annual_return)),
+                "max_drawdown": sanitize(float(max_dd)),
+                "sharpe_ratio": sanitize(float(sharpe)),
+                "win_rate": sanitize(float(win_rate)),
+                "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            }
+            
+            results_path = os.path.join(OUTPUT_DIR, "experiment_results.json")
+            with open(results_path, "w") as f:
+                json.dump(results, f, indent=4)
+            print(f"Saved experiment results to: {results_path}")
+
         except Exception as e:
             print(f"Plotting failed: {e}")
 
@@ -162,6 +185,10 @@ class FactorAnalyzer:
                 "Direction": "Positive" if ic > 0 else "Negative"
             })
             
+        if not results:
+            print("No valid features found for analysis.")
+            return
+
         results_df = pd.DataFrame(results).sort_values("IC", ascending=False)
         
         # Sort by Abs(IC) for impact
