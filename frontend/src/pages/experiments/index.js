@@ -132,11 +132,11 @@ export default function Experiments() {
                                     <tr key={exp.id} style={{ borderBottom: '1px solid #21262d' }}>
                                         <td style={{ padding: '12px 8px', color: '#58a6ff', fontWeight: 600 }}>#{exp.id}</td>
                                         <td style={{ padding: '12px 8px', color: '#c9d1d9' }}>{exp.name}</td>
-                                        <td style={{ padding: '12px 8px', textAlign: 'right', fontFamily: 'monospace', color: exp.metrics?.sharpe > 0 ? '#2ecc71' : '#e74c3c' }}>
-                                            {exp.metrics?.sharpe !== undefined ? exp.metrics.sharpe.toFixed(3) : '-'}
+                                        <td style={{ padding: '12px 8px', textAlign: 'right', fontFamily: 'monospace', color: (exp.metrics?.sharpe || 0) > 0 ? '#2ecc71' : '#e74c3c' }}>
+                                            {typeof exp.metrics?.sharpe === 'number' ? exp.metrics.sharpe.toFixed(3) : '-'}
                                         </td>
-                                        <td style={{ padding: '12px 8px', textAlign: 'right', fontFamily: 'monospace', color: exp.metrics?.rank_ic > 0.02 ? '#2ecc71' : '#f1c40f' }}>
-                                            {exp.metrics?.rank_ic !== undefined ? exp.metrics.rank_ic.toFixed(4) : '-'}
+                                        <td style={{ padding: '12px 8px', textAlign: 'right', fontFamily: 'monospace', color: (exp.metrics?.rank_ic || 0) > 0.02 ? '#2ecc71' : '#f1c40f' }}>
+                                            {typeof exp.metrics?.rank_ic === 'number' ? exp.metrics.rank_ic.toFixed(4) : '-'}
                                         </td>
                                         <td style={{ padding: '12px 8px', color: '#8b949e', fontSize: '0.85rem' }}>
                                             {exp.timestamp ? new Date(exp.timestamp * 1000).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false }) : '-'}

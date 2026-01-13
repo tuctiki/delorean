@@ -4,6 +4,7 @@ import subprocess
 import json
 from typing import Optional, List, Dict, Any
 import pandas as pd
+import math
 from fastapi import FastAPI, BackgroundTasks, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -120,60 +121,67 @@ def get_recommendations():
 
 @app.get("/api/experiments")
 def list_experiments():
-    """List all experiments with summary metrics from latest run."""
-    experiments = []
-    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    mlruns_path = os.path.join(root, "mlruns")
-    
-    if os.path.exists(mlruns_path):
-        for d in os.listdir(mlruns_path):
-            full_path = os.path.join(mlruns_path, d)
-            if os.path.isdir(full_path) and d.isdigit():
-                # Get creation time
-                creation_time = os.path.getmtime(full_path)
-                creation_str = pd.Timestamp(creation_time, unit='s').strftime('%Y-%m-%d %H:%M:%S')
-                 
-                # Read meta.yaml for experiment name
-                exp_name = f"Experiment {d}"
-                meta_path = os.path.join(full_path, "meta.yaml")
-                if os.path.exists(meta_path):
-                    try:
-                        with open(meta_path, "r") as f:
-                            for line in f:
-                                if line.strip().startswith("name:"):
-                                    exp_name = line.split(":", 1)[1].strip()
-                                    break
-                    except: pass
-                
-                # [NEW] Read metrics from latest run
-                metrics = {}
-                runs = [r for r in os.listdir(full_path) if os.path.isdir(os.path.join(full_path, r)) and len(r) > 20]
-                if runs:
-                    runs.sort(key=lambda x: os.path.getmtime(os.path.join(full_path, x)), reverse=True)
-                    latest_run = runs[0]
-                    metrics_path = os.path.join(full_path, latest_run, "metrics")
-                    if os.path.exists(metrics_path):
-                        for mf in os.listdir(metrics_path):
-                            try:
-                                with open(os.path.join(metrics_path, mf), "r") as f:
-                                    # MLflow format: timestamp value step
-                                    parts = f.read().strip().split()
-                                    if len(parts) >= 2:
-                                        metrics[mf] = float(parts[1])  # Value is second column
-                            except: pass
-                 
-                experiments.append({
-                    "id": d, 
-                    "name": exp_name, 
-                    "artifact_location": full_path,
-                    "creation_time": creation_str,
-                    "timestamp": creation_time,
-                    "metrics": metrics
-                })
-    
-    # Sort by Timestamp Descending
-    experiments.sort(key=lambda x: x["timestamp"], reverse=True)
-    return experiments
+    try:
+        experiments = []
+        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        mlruns_path = os.path.join(root, "mlruns")
+        
+        if os.path.exists(mlruns_path):
+            for d in os.listdir(mlruns_path):
+                full_path = os.path.join(mlruns_path, d)
+                if os.path.isdir(full_path) and d.isdigit():
+                    # Get creation time
+                    creation_time = os.path.getmtime(full_path)
+                    creation_str = pd.Timestamp(creation_time, unit='s').strftime('%Y-%m-%d %H:%M:%S')
+                    
+                    # Read meta.yaml for experiment name
+                    exp_name = f"Experiment {d}"
+                    meta_path = os.path.join(full_path, "meta.yaml")
+                    if os.path.exists(meta_path):
+                        try:
+                            with open(meta_path, "r") as f:
+                                for line in f:
+                                    if line.strip().startswith("name:"):
+                                        exp_name = line.split(":", 1)[1].strip()
+                                        break
+                        except: pass
+                    
+                    # [NEW] Read metrics from latest run
+                    metrics = {}
+                    runs = [r for r in os.listdir(full_path) if os.path.isdir(os.path.join(full_path, r)) and len(r) > 20]
+                    if runs:
+                        runs.sort(key=lambda x: os.path.getmtime(os.path.join(full_path, x)), reverse=True)
+                        latest_run = runs[0]
+                        metrics_path = os.path.join(full_path, latest_run, "metrics")
+                        if os.path.exists(metrics_path):
+                            for mf in os.listdir(metrics_path):
+                                try:
+                                    with open(os.path.join(metrics_path, mf), "r") as f:
+                                        # MLflow format: timestamp value step
+                                        parts = f.read().strip().split()
+                                        if len(parts) >= 2:
+                                            val = float(parts[1])
+                                            # JSON does not support NaN/Inf
+                                            if math.isnan(val) or math.isinf(val):
+                                                val = None 
+                                            metrics[mf] = val
+                                except: pass
+                    
+                    experiments.append({
+                        "id": d, 
+                        "name": exp_name, 
+                        "artifact_location": full_path,
+                        "creation_time": creation_str,
+                        "timestamp": creation_time,
+                        "metrics": metrics
+                    })
+        
+        # Sort by Timestamp Descending
+        experiments.sort(key=lambda x: x["timestamp"], reverse=True)
+        return experiments
+    except Exception as e:
+        import traceback
+        return [{"id": "error", "name": f"Error: {str(e)}", "timestamp": 0, "metrics": {}, "creation_time": traceback.format_exc()}]
 
 @app.get("/api/experiment_results")
 def get_experiment_results():
