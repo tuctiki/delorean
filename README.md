@@ -97,6 +97,7 @@ python scripts/run_etf_analysis.py \
 -   `--risk_parity`: Enable Volatility Targeting (Optional, 1/Vol weighting).
 -   `--start_time / --end_time`: Data range overrides.
 -   `--train_end_time / --test_start_time`: Split configuration.
+-   `--experiment_name <str>`: Custom name for MLflow experiment (default: "ETF_Strategy_Refactored").
 
 ## Implementation Details
 
@@ -116,10 +117,23 @@ The strategy utilizes a **Custom Hybrid Factor Model** composed of 12 robust fac
 11. **Trend_Momentum**: `Mean($close, 10) * Slope($close, 10)` - Trend strength indicator.
 12. **Vol_Breakout**: Volatility breakout proxy combining log(MAHIGH10)² with upper band.
 
+### ETF Universe (14 Assets)
+- **Broad Market**: CSI 300 (510300.SH), A500 (563360.SH), ChiNext (159915.SZ), STAR 50 (588000.SH), CSI 1000 (512100.SH)
+- **Sector**: Semiconductor (512480.SH), New Energy (516160.SH), Liquor (512690.SH), Bank (512800.SH), Pharma (512010.SH), Consumer (510630.SH), PV/Solar (515790.SH), Securities (512880.SH)
+- **Defensive**: Dividend RedChip (510880.SH)
+
 **Optimization Technique**:
 -   **Preprocessing**: Cross-Sectional Z-Score Feature Neutralization.
 -   **Labeling**: **5-Day Forward Return** (`Ref($close, -5) / $close - 1`).
 -   **Modeling**: LightGBM Regressor.
+
+### Model Hyperparameters (Stage 1)
+- **Learning Rate**: 0.02
+- **Num Leaves**: 19
+- **Max Depth**: 5
+- **Feature Fraction (Colsample)**: 0.61
+- **Bagging Fraction (Subsample)**: 0.6
+- **Regularization**: L1=7.5, L2=2.5
 
 ### Position Control
 The strategy now supports advanced position sizing:
