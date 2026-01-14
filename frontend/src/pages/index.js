@@ -60,6 +60,12 @@ export default function Home() {
           <h1 className={styles.title}>Dashboard</h1>
           <div style={{ display: 'flex', gap: '10px' }}>
             <Link
+              href="/operations"
+              style={{ color: '#2ecc71', textDecoration: 'none', border: '1px solid #238636', padding: '4px 12px', borderRadius: '6px', fontSize: '0.9rem', fontWeight: 600 }}
+            >
+              Operations
+            </Link>
+            <Link
               href="/experiments"
               style={{ color: '#58a6ff', textDecoration: 'none', border: '1px solid #30363d', padding: '4px 12px', borderRadius: '6px', fontSize: '0.9rem' }}
             >
@@ -75,20 +81,28 @@ export default function Home() {
         </div>
 
 
-        {/* Row 1: Status & Controls, Strategy, Market, Validation */}
+        {/* Row 1: Task Status, Strategy, Market, Validation */}
         <div className={`${styles.card} ${styles.col3}`}>
           <div className={styles.cardHeader}>
-            <h2><Activity size={20} /> Daily Task</h2>
-            <button
-              className={styles.runButton}
-              onClick={handleRun}
-              disabled={isRunning}
+            <h2><Activity size={20} /> Task Status</h2>
+            <Link
+              href="/operations"
+              style={{ color: '#58a6ff', textDecoration: 'none', fontSize: '0.85rem' }}
             >
-              {isRunning ? 'Running...' : 'Run'} <Play size={16} />
-            </button>
+              View Logs →
+            </Link>
           </div>
-          <div className={styles.console} ref={consoleRef}>
-            {status?.log || "Ready to run..."}
+          <div className={styles.stats}>
+            <div className={styles.statRow}>
+              <span>Daily Signal</span>
+              <strong style={{ color: isRunning ? '#f1c40f' : '#2ecc71' }}>
+                {isRunning ? 'Running...' : 'Ready'}
+              </strong>
+            </div>
+            <div className={styles.statRow}>
+              <span>Last Update</span>
+              <strong>{recs?.generation_time?.split(' ')[1] || '-'}</strong>
+            </div>
           </div>
         </div>
 

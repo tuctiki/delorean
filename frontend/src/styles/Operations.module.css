@@ -1,0 +1,299 @@
+.container {
+    padding: 20px;
+    max-width: 1400px;
+    margin: 0 auto;
+    min-height: 100vh;
+}
+
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+}
+
+.header h1 {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 1.8rem;
+    color: #f0f6fc;
+    margin: 0;
+}
+
+.backLink {
+    color: #8b949e;
+    text-decoration: none;
+    padding: 8px 16px;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    transition: all 0.2s;
+}
+
+.backLink:hover {
+    color: #58a6ff;
+    border-color: #58a6ff;
+}
+
+.grid {
+    display: grid;
+    grid-template-columns: 350px 1fr;
+    gap: 24px;
+    height: calc(100vh - 140px);
+}
+
+@media (max-width: 1000px) {
+    .grid {
+        grid-template-columns: 1fr;
+        height: auto;
+    }
+}
+
+/* Task Cards */
+.taskCards {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.taskCard {
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 12px;
+    padding: 20px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.taskCard:hover {
+    border-color: #484f58;
+}
+
+.taskCard.active {
+    border-color: #58a6ff;
+    box-shadow: 0 0 0 1px #58a6ff;
+}
+
+.taskHeader {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    margin-bottom: 16px;
+}
+
+.taskIcon {
+    width: 48px;
+    height: 48px;
+    background: rgba(88, 166, 255, 0.1);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #58a6ff;
+}
+
+.taskInfo {
+    flex: 1;
+}
+
+.taskInfo h3 {
+    margin: 0 0 4px 0;
+    font-size: 1.1rem;
+    color: #f0f6fc;
+}
+
+.taskInfo p {
+    margin: 0;
+    font-size: 0.85rem;
+    color: #8b949e;
+}
+
+.taskStatus {
+    margin-bottom: 16px;
+}
+
+.taskStatus span {
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.running {
+    color: #f1c40f;
+}
+
+.ready {
+    color: #8b949e;
+}
+
+.success {
+    color: #2ecc71;
+}
+
+.error {
+    color: #e74c3c;
+}
+
+.runButton {
+    width: 100%;
+    padding: 12px;
+    background: linear-gradient(135deg, #238636 0%, #2ea043 100%);
+    border: none;
+    border-radius: 8px;
+    color: #fff;
+    font-weight: 600;
+    font-size: 0.95rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: all 0.2s;
+}
+
+.runButton:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(35, 134, 54, 0.4);
+}
+
+.runButton:disabled {
+    background: #21262d;
+    color: #8b949e;
+    cursor: not-allowed;
+}
+
+.runButton.purple {
+    background: linear-gradient(135deg, #8957e5 0%, #a371f7 100%);
+}
+
+.runButton.purple:hover:not(:disabled) {
+    box-shadow: 0 4px 12px rgba(137, 87, 229, 0.4);
+}
+
+/* Log Panel */
+.logPanel {
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.logHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    border-bottom: 1px solid #30363d;
+    background: #161b22;
+}
+
+.logTabs {
+    display: flex;
+    gap: 8px;
+}
+
+.logTab {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    color: #8b949e;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.logTab:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.logTab.activeTab {
+    background: #21262d;
+    border-color: #30363d;
+    color: #f0f6fc;
+}
+
+.liveDot {
+    width: 6px;
+    height: 6px;
+    background: #2ecc71;
+    border-radius: 50%;
+    animation: pulse 1s ease-in-out infinite;
+}
+
+@keyframes pulse {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.4;
+    }
+}
+
+.logStatus {
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.liveIndicator {
+    color: #2ecc71;
+    animation: pulse 1s ease-in-out infinite;
+}
+
+.idleIndicator {
+    color: #8b949e;
+}
+
+.logContent {
+    flex: 1;
+    padding: 16px;
+    overflow-y: auto;
+    background: #000;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 0.8rem;
+    line-height: 1.5;
+    min-height: 400px;
+}
+
+.logContent pre {
+    margin: 0;
+    color: #7ee787;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+.logPlaceholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: #484f58;
+    text-align: center;
+}
+
+.logPlaceholder p {
+    margin: 16px 0 0 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.spinning {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
