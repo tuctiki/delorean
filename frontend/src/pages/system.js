@@ -1,6 +1,5 @@
 import useSWR from 'swr';
-import Link from 'next/link';
-import { Settings, Database, Cpu, List } from 'lucide-react';
+import { Database, Cpu, List } from 'lucide-react';
 
 const fetcher = (...args) => fetch(...args).then(res => res.json());
 
@@ -12,16 +11,6 @@ export default function SystemSettings() {
 
     return (
         <div style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto' }}>
-            <div style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <Link href="/" style={{ color: '#8b949e', textDecoration: 'none' }}>Dashboard</Link>
-                <span style={{ color: '#30363d' }}>/</span>
-                <span style={{ color: '#c9d1d9' }}>System Settings</span>
-            </div>
-
-            <h1 style={{ marginBottom: '30px', borderBottom: '1px solid #30363d', paddingBottom: '10px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <Settings size={28} /> System Settings
-            </h1>
-
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(500px, 1fr))', gap: '20px' }}>
 
                 {/* Section 1: Model Hyperparameters */}
