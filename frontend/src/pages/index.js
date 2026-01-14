@@ -56,31 +56,6 @@ export default function Home() {
   return (
     <>
       <div className={styles.grid}>
-        <div style={{ gridColumn: '1 / -1', marginBottom: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h1 className={styles.title}>Dashboard</h1>
-          <div style={{ display: 'flex', gap: '10px' }}>
-            <Link
-              href="/operations"
-              style={{ color: '#2ecc71', textDecoration: 'none', border: '1px solid #238636', padding: '4px 12px', borderRadius: '6px', fontSize: '0.9rem', fontWeight: 600 }}
-            >
-              Operations
-            </Link>
-            <Link
-              href="/experiments"
-              style={{ color: '#58a6ff', textDecoration: 'none', border: '1px solid #30363d', padding: '4px 12px', borderRadius: '6px', fontSize: '0.9rem' }}
-            >
-              Experiments
-            </Link>
-            <Link
-              href="/system"
-              style={{ color: '#8b949e', textDecoration: 'none', border: '1px solid #30363d', padding: '4px 12px', borderRadius: '6px', fontSize: '0.9rem' }}
-            >
-              System
-            </Link>
-          </div>
-        </div>
-
-
         {/* Row 1: Task Status, Strategy, Market, Validation */}
         <div className={`${styles.card} ${styles.col3}`}>
           <div className={styles.cardHeader}>

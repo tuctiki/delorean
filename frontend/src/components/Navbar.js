@@ -18,13 +18,17 @@ export default function Navbar() {
                     <Home size={18} />
                     <span>Dashboard</span>
                 </Link>
-                <Link href="/data" className={`${styles.link} ${isActive('/data') ? styles.active : ''}`}>
+                <Link href="/operations" className={`${styles.link} ${isActive('/operations') ? styles.active : ''}`}>
                     <Database size={18} />
-                    <span>Data</span>
+                    <span>Operations</span>
                 </Link>
                 <Link href="/experiments" className={`${styles.link} ${isActive('/experiments') ? styles.active : ''}`}>
                     <BarChart2 size={18} />
                     <span>Experiments</span>
+                </Link>
+                <Link href="/system" className={`${styles.link} ${isActive('/system') ? styles.active : ''}`}>
+                    <Github size={18} />
+                    <span>System</span>
                 </Link>
             </div>
         </nav>

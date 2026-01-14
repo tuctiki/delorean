@@ -64,12 +64,6 @@ export default function Operations() {
 
     return (
         <div className={styles.container}>
-            {/* Header */}
-            <div className={styles.header}>
-                <h1><Terminal size={28} /> Operations Center</h1>
-                <Link href="/" className={styles.backLink}>← Dashboard</Link>
-            </div>
-
             <div className={styles.grid}>
                 {/* Task Cards */}
                 <div className={styles.taskCards}>
