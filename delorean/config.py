@@ -68,7 +68,7 @@ LIVE_TRADING_CONFIG = {
     "label_horizon": 5,         # Forward return prediction horizon
     "topk": 5,                  # Number of top ETFs to recommend
     "regime_ma_window": 60,     # MA window for market regime filter
-    "use_regime_filter": False, # Market Regime Filter (False = OFF by default)
+    "use_regime_filter": True, # Market Regime Filter (True = ON by default for risk protection)
 }
 
 # Output Config
@@ -79,16 +79,17 @@ if not os.path.exists(OUTPUT_DIR):
 
 # Model Hyperparameters
 # Stage 1: Standard Qlib LGBModel (Experiment 8 Optimized)
+# UPDATED 2026-01-15: Reduced regularization/constraints for robustness on small data
 MODEL_PARAMS_STAGE1 = {
     "loss": "mse",
     "colsample_bytree": 0.6116,
     "learning_rate": 0.02,
     "subsample": 0.6,
-    "lambda_l1": 0.5,
-    "lambda_l2": 0.5,
+    "lambda_l1": 0.1,  # Reduced from 0.5
+    "lambda_l2": 0.1,  # Reduced from 0.5
     "max_depth": 5,
     "num_leaves": 19,
-    "min_data_in_leaf": 34,
+    "min_data_in_leaf": 20, # Reduced from 34
     "early_stopping_rounds": 100,
     "num_boost_round": 1000
     # Seed injected at runtime
