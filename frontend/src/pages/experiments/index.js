@@ -7,9 +7,11 @@ import styles from '../../styles/Experiments.module.css';
 
 const fetcher = (...args) => fetch(...args).then(res => res.json());
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
 export default function Experiments() {
-    const { data: experiments, error: expError, mutate: mutateExperiments } = useSWR('http://localhost:8000/api/experiments', fetcher);
-    const { data: results, error: resultsError, mutate: mutateResults } = useSWR('http://localhost:8000/api/experiment_results', fetcher);
+    const { data: experiments, error: expError, mutate: mutateExperiments } = useSWR(`${API_URL}/api/experiments`, fetcher);
+    const { data: results, error: resultsError, mutate: mutateResults } = useSWR(`${API_URL}/api/experiment_results`, fetcher);
 
     return (
         <div style={{ padding: '20px', maxWidth: '1400px', margin: '0 auto' }}>

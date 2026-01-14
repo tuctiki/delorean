@@ -1,0 +1,58 @@
+# Base image matching user environment
+FROM python:3.12-slim
+
+# Set locale for unicode support
+ENV LANG C.UTF-8
+ENV LC_ALL C.UTF-8
+
+# Install system dependencies required for Qlib and other scientific packages
+# git is often needed for pip installing from git repositories
+# cron is needed for scheduling tasks
+# Using retries and --fix-missing to handle transient network/mirror issues
+RUN apt-get update -o Acquire::Retries=3 && \
+    apt-get install -y -o Acquire::Retries=3 --no-install-recommends --fix-missing \
+    gcc \
+    g++ \
+    make \
+    wget \
+    cron \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set working directory
+WORKDIR /app
+
+# Copy requirements first to leverage Docker cache
+COPY requirements.txt .
+
+# Upgrade pip to avoid hash mismatch and other issues
+RUN pip install --upgrade pip
+
+# Pre-install build dependencies for Qlib
+RUN pip install --default-timeout=1000 --no-cache-dir "numpy<2.0.0" cython
+
+# Install Python dependencies
+RUN pip install --default-timeout=1000 --no-cache-dir -r requirements.txt
+
+# Copy the rest of the application
+COPY . .
+
+# Setup Cron
+# Copy crontab file to the cron.d directory
+COPY crontab /etc/cron.d/delorean-cron
+
+# Give execution rights on the cron job
+RUN chmod 0644 /etc/cron.d/delorean-cron
+
+# Apply cron job
+RUN crontab /etc/cron.d/delorean-cron
+
+# Create logs directory
+RUN mkdir -p /app/logs
+
+# Expose the port the app runs on
+EXPOSE 8000
+
+# Run the command on container startup
+# Start cron in the background and run the fastAPI server
+CMD cron && python server/main.py

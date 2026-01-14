@@ -3,8 +3,10 @@ import { Database, Cpu, List } from 'lucide-react';
 
 const fetcher = (...args) => fetch(...args).then(res => res.json());
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
 export default function SystemSettings() {
-    const { data: config, error } = useSWR('http://localhost:8000/api/config', fetcher);
+    const { data: config, error } = useSWR(`${API_URL}/api/config`, fetcher);
 
     if (error) return <div>Error loading config</div>;
     if (!config) return <div>Loading...</div>;

@@ -9,11 +9,13 @@ import styles from '../styles/Home.module.css';
 
 const fetcher = (...args) => fetch(...args).then(res => res.json());
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
 export default function Home() {
-  const { data: recs, error: recError, isLoading: recsLoading } = useSWR('http://localhost:8000/api/recommendations', fetcher, { refreshInterval: 5000 });
-  const { data: status, error: statusError } = useSWR('http://localhost:8000/api/status', fetcher, { refreshInterval: 1000 });
-  const { data: performance, isLoading: perfLoading } = useSWR('http://localhost:8000/api/performance', fetcher, { refreshInterval: 30000 });
-  const { data: history, isLoading: historyLoading } = useSWR('http://localhost:8000/api/recommendation-history', fetcher, { refreshInterval: 60000 });
+  const { data: recs, error: recError, isLoading: recsLoading } = useSWR(`${API_URL}/api/recommendations`, fetcher, { refreshInterval: 5000 });
+  const { data: status, error: statusError } = useSWR(`${API_URL}/api/status`, fetcher, { refreshInterval: 1000 });
+  const { data: performance, isLoading: perfLoading } = useSWR(`${API_URL}/api/performance`, fetcher, { refreshInterval: 30000 });
+  const { data: history, isLoading: historyLoading } = useSWR(`${API_URL}/api/recommendation-history`, fetcher, { refreshInterval: 60000 });
 
   const [isRunning, setIsRunning] = useState(false);
   const [capital, setCapital] = useState(100000);
@@ -29,7 +31,7 @@ export default function Home() {
   const handleRun = async () => {
     setIsRunning(true);
     try {
-      await fetch('http://localhost:8000/api/run-daily', { method: 'POST' });
+      await fetch(`${API_URL}/api/run-daily`, { method: 'POST' });
     } catch (e) {
       console.error(e);
       setIsRunning(false);

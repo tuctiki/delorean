@@ -6,13 +6,15 @@ import styles from '../styles/Operations.module.css';
 
 const fetcher = (...args) => fetch(...args).then(res => res.json());
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
 export default function Operations() {
     // Daily Task State
-    const { data: dailyStatus } = useSWR('http://localhost:8000/api/status', fetcher, { refreshInterval: 1000 });
+    const { data: dailyStatus } = useSWR(`${API_URL}/api/status`, fetcher, { refreshInterval: 1000 });
     const [dailyRunning, setDailyRunning] = useState(false);
 
     // Backtest State
-    const { data: backtestStatus } = useSWR('http://localhost:8000/api/backtest-status', fetcher, { refreshInterval: 1000 });
+    const { data: backtestStatus } = useSWR(`${API_URL}/api/backtest-status`, fetcher, { refreshInterval: 1000 });
     const [backtestRunning, setBacktestRunning] = useState(false);
 
     // Active log panel
@@ -37,7 +39,7 @@ export default function Operations() {
 
     const handleRunDaily = async () => {
         try {
-            await fetch('http://localhost:8000/api/run-daily', { method: 'POST' });
+            await fetch(`${API_URL}/api/run-daily`, { method: 'POST' });
             setActiveLog('daily');
         } catch (e) {
             console.error(e);
@@ -46,7 +48,7 @@ export default function Operations() {
 
     const handleRunBacktest = async () => {
         try {
-            await fetch('http://localhost:8000/api/run-backtest', { method: 'POST' });
+            await fetch(`${API_URL}/api/run-backtest`, { method: 'POST' });
             setActiveLog('backtest');
         } catch (e) {
             console.error(e);

@@ -6,12 +6,14 @@ import styles from '../../styles/Data.module.css';
 
 const fetcher = (...args) => fetch(...args).then(res => res.json());
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
 export default function DataViewer() {
-    const { data: etfs } = useSWR('http://localhost:8000/api/search', fetcher);
+    const { data: etfs } = useSWR(`${API_URL}/api/search`, fetcher);
     const [selectedSymbol, setSelectedSymbol] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
 
-    const { data: history } = useSWR(selectedSymbol ? `http://localhost:8000/api/data/${selectedSymbol}` : null, fetcher);
+    const { data: history } = useSWR(selectedSymbol ? `${API_URL}/api/data/${selectedSymbol}` : null, fetcher);
 
     const filteredEtfs = etfs?.filter(s => s.toLowerCase().includes(searchTerm.toLowerCase()));
 

@@ -1,0 +1,27 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    ports:
+      - "8005:8000"
+    volumes:
+      - ~/.qlib/qlib_data/cn_etf_data:/root/.qlib/qlib_data/cn_etf_data
+      - ./mlruns:/app/mlruns
+      - ./artifacts:/app/artifacts
+      - ./logs:/app/logs
+    restart: always
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8005
+    ports:
+      - "3005:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8005
+    depends_on:
+      - backend
+    restart: always

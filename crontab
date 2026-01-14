@@ -1,0 +1,2 @@
+# Run daily trading task at 18:00 on weekdays (Monday-Friday)
+0 18 * * 1-5 cd /app && /usr/local/bin/python scripts/run_live_trading.py >> /app/logs/cron.log 2>&1

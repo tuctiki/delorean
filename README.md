@@ -219,3 +219,22 @@ python scripts/run_daily_task.py
 1. **Downloads** latest market data from AkShare.
 2. **Updates** the Qlib binary database.
 3. **Executes** the Live Trading Engine (`run_live_trading.py`) to generate `daily_recommendations.json`.
+
+## Docker Deployment
+
+To build and run the application using Docker:
+
+1.  **Prerequisites**: Ensure Docker and Docker Compose are installed.
+2.  **Data**: The setup assumes Qlib data is at `~/.qlib/qlib_data/cn_etf_data`.
+3.  **Run**:
+    ```bash
+    docker compose up -d --build
+    ```
+4.  **Access**:
+    - Frontend: http://localhost:3005
+    - Backend API: http://localhost:8005
+
+> [!NOTE]
+> If deploying to a remote server, update `NEXT_PUBLIC_API_URL` in `docker-compose.yml` to the server's IP or domain before building.
+
+The backend container also runs a cron job for daily trading tasks at 18:00 on weekdays.
