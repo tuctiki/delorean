@@ -16,40 +16,32 @@ class ETFDataHandler(DataHandlerLP):
     def get_custom_factors():
         """
         Returns a tuple of (expressions, names) for the custom ETF factors.
+        Optimized 7-factor library after 2026-01-14 audit.
         """
         custom_exprs = [
-            "Log(Mean($volume * $close, 20))",                  
-            "$close / Ref($close, 60) - 1",                     
-            "$close / Ref($close, 120) - 1",                    
-            # Removed REV5 (Weak)
-            # Removed VOL20 (Redundant)
-            "Std($close / Ref($close, 1) - 1, 60)",             
-            # Removed VOL120 (Redundant)
-            # Removed BB_Width_Norm (Redundant)
-            # Removed KC_Width_Norm (2026-01-14 Audit: Redundant with VOL60, IC=-0.072)
-            # Removed Squeeze_Ratio (Weak)
-            "( ($close / Ref($close, 20) - 1) / Std($close, 20) )", # Vol-Adj Momentum (20-day)
-            "-1 * ($close - 2*Ref($close, 5) + Ref($close, 10))",   # Reversal on Acceleration
-            # Removed ROC_Rev (2026-01-14 Audit: No signal, IC=-0.001)
-            # === VALIDATED FACTORS (Alpha Mining 2026-01-14) ===
-            # Removed VolAdj_Mom_10 (2026-01-14 Audit: 0.98 correlation with Mom_Vol_Combo)
-            # Replaced Mom_Vol_Combo with Trend_Efficiency (Round 3 Validated OOS IC=0.034)
-            "($close / Ref($close, 20) - 1) / (Std($close / Ref($close, 1) - 1, 20) + 0.0001)", # Trend_Efficiency (Risk-Adj Mom 20d)
-            "($close - $open) / (Abs($open - Ref($close, 1)) + 0.001)",  # Gap_Fill (IC=0.032, unique)
+            "Log(Mean($volume * $close, 20))",                  # MarketCap_Liquidity
+            "$close / Ref($close, 60) - 1",                     # MOM60
+            "$close / Ref($close, 120) - 1",                    # MOM120
+            # Removed VOL60 (2026-01-14 Audit: Negative IC=-0.063)
+            # Removed Mom20_VolAdj (2026-01-14 Audit: 0.79 corr with Trend_Efficiency)
+            # Removed Accel_Rev (2026-01-14 Audit: 0.85 corr with Acceleration)
+            # === VALIDATED FACTORS ===
+            "($close / Ref($close, 20) - 1) / (Std($close / Ref($close, 1) - 1, 20) + 0.0001)", # Trend_Efficiency (IC=0.034)
+            "($close - $open) / (Abs($open - Ref($close, 1)) + 0.001)",  # Gap_Fill (IC=0.032)
+            # === ROUND 4 FACTORS (Alpha Mining 2026-01-14) ===
+            "Sum(If($close > Ref($close, 1), 1, 0), 10) / 10",  # Mom_Persistence (IC=0.059)
+            "($close / Ref($close, 5) - 1) - (Ref($close, 5) / Ref($close, 10) - 1)",  # Acceleration (IC=0.053)
         ]
         
         custom_names = [
              "MarketCap_Liquidity",
              "MOM60",
              "MOM120",
-             "VOL60",
-             # Removed KC_Width_Norm (Audit: Redundant)
-             "Mom20_VolAdj",
-             "Accel_Rev",
-             # Removed ROC_Rev (Audit: No signal)
-             # Optimized validated factors (removed VolAdj_Mom_10 due to 0.98 correlation)
+             # Removed: VOL60, Mom20_VolAdj, Accel_Rev (2026-01-14 Audit)
              "Trend_Efficiency",
              "Gap_Fill",
+             "Mom_Persistence",
+             "Acceleration",
         ]
         return custom_exprs, custom_names
 

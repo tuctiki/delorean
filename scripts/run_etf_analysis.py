@@ -3,7 +3,8 @@ import pandas as pd
 import qlib
 import sys
 import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from delorean.config import QLIB_PROVIDER_URI, QLIB_REGION, BENCHMARK, START_TIME, END_TIME, DEFAULT_EXPERIMENT_NAME, TEST_START_TIME, TRAIN_END_TIME
 from delorean.data import ETFDataLoader
@@ -14,6 +15,7 @@ from delorean.experiment_manager import ExperimentManager
 from delorean.feature_selection import FeatureSelector
 from delorean.signals import smooth_predictions
 from delorean.regime import calculate_regime_series
+from delorean.utils import fix_seed
 from qlib.workflow import R
 
 def parse_args() -> argparse.Namespace:
@@ -41,24 +43,7 @@ def parse_args() -> argparse.Namespace:
     
     return parser.parse_args()
 
-def fix_seed(seed: int) -> None:
-    """
-    Fix random seeds for reproducibility.
-    """
-    import random
-    import numpy as np
-    
-    random.seed(seed)
-    np.random.seed(seed)
-    
-    try:
-        import torch
-        torch.manual_seed(seed)
-        if torch.cuda.is_available():
-            torch.cuda.manual_seed_all(seed)
-    except ImportError:
-        pass
-    print(f"Random Seed Fixed: {seed}")
+# fix_seed is now imported from delorean.utils
 
 def main() -> None:
     """
@@ -216,6 +201,7 @@ def main() -> None:
             print("Fetching Volatility Data for Risk Parity...")
             # Fetch explicitly via Qlib
             try:
+                from qlib.data import D
                 # Std($close/Ref($close,1)-1, 20)
                 # Note: Qlib expressions need to be exact.
                 vol_data = D.features(D.instruments(market=QLIB_REGION), ['Std($close/Ref($close,1)-1, 20)'], start_time=START_TIME, end_time=END_TIME)
@@ -225,11 +211,8 @@ def main() -> None:
                 print(f"Warning: Failed to fetch VOL20 data: {e}")
                 vol_feature = None
 
-        # Prepare Benchmark Feature for Dynamic Exposure (Close, MA60)
-        exposure_bench_feature = None
-        if args.dynamic_exposure:
-             # bench_close already has 'close' and 'ma60' columns
-             exposure_bench_feature = bench_close
+        # Note: Dynamic exposure feature is handled via market_regime in BacktestEngine
+        # The bench_close variable was undefined here - removed dead code
 
         # Pass updated robust params AND Market Regime (User Requested)
         report, positions = backtest_engine.run(

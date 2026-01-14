@@ -8,8 +8,8 @@ Routes are organized into modular files under server/routes/.
 import sys
 import os
 
-# Ensure we can import from project root
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Add project root to path for imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware

@@ -5,60 +5,35 @@ Centralized utility functions for common operations across the codebase.
 """
 import pandas as pd
 import logging
+import random
+import numpy as np
 from typing import Optional
 
 logger = logging.getLogger(__name__)
 
+# Re-export smooth_predictions from signals module for backward compatibility
+from delorean.signals import smooth_predictions
 
-def smooth_predictions(
-    pred: pd.Series, 
-    halflife: int = 15, 
-    level_name: str = 'instrument'
-) -> pd.Series:
+
+def fix_seed(seed: int = 42) -> None:
     """
-    Apply EWMA smoothing to prediction scores.
-    
-    Smooths predictions per instrument to reduce noise and improve signal stability.
-    This is particularly useful for reducing turnover in trading strategies.
+    Fix random seeds for reproducibility across all libraries.
     
     Args:
-        pred: Prediction series with MultiIndex (datetime, instrument).
-        halflife: EWMA halflife in days (default: 15).
-        level_name: Name of the instrument level in the index (default: 'instrument').
-        
-    Returns:
-        Smoothed prediction series with same index structure.
-        
-    Example:
-        >>> pred_smooth = smooth_predictions(pred_raw, halflife=10)
+        seed: Random seed value.
     """
-    if pred.empty:
-        logger.warning("Empty prediction series provided to smooth_predictions")
-        return pred
+    random.seed(seed)
+    np.random.seed(seed)
     
-    # Detect the correct level name
-    if pred.index.names[1] == 'instrument':
-        level_name = 'instrument'
-    elif len(pred.index.names) > 1:
-        level_name = pred.index.names[1]
+    try:
+        import torch
+        torch.manual_seed(seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed_all(seed)
+    except ImportError:
+        pass
     
-    # Apply EWMA per instrument
-    pred_smooth = pred.groupby(level=level_name).apply(
-        lambda x: x.ewm(halflife=halflife, min_periods=1).mean()
-    )
-    
-    # Clean up the index structure
-    if pred_smooth.index.nlevels > 2:
-        pred_smooth = pred_smooth.droplevel(0)
-    
-    # Ensure datetime is first level
-    if pred_smooth.index.names[0] != 'datetime' and 'datetime' in pred_smooth.index.names:
-        pred_smooth = pred_smooth.swaplevel()
-    
-    pred_smooth = pred_smooth.dropna().sort_index()
-    
-    logger.debug(f"Smoothed predictions with halflife={halflife}, shape={pred_smooth.shape}")
-    return pred_smooth
+    logger.debug(f"Random seed fixed: {seed}")
 
 
 def calculate_rank_ic(
@@ -143,3 +118,4 @@ def get_benchmark_ma_ratio(
     except Exception as e:
         logger.error(f"Failed to fetch benchmark MA ratio: {e}")
         return pd.Series(dtype=float)
+
