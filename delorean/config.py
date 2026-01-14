@@ -51,6 +51,25 @@ QLIB_REGION = REG_CN
 # MLflow Config
 DEFAULT_EXPERIMENT_NAME = "ETF_Strategy"
 
+# Default Backtest Parameters (used by Run Backtest button)
+DEFAULT_BACKTEST_PARAMS = {
+    "start_time": "2015-01-01",
+    "train_end_time": "2022-12-31",
+    "test_start_time": "2023-01-01",
+    "no_regime": True,
+}
+
+# Live Trading Configuration (used by run_live_trading.py)
+LIVE_TRADING_CONFIG = {
+    "validation_days": 60,      # Days for out-of-sample validation
+    "production_split_days": 14, # Days for production signal split
+    "smooth_window": 15,        # EWMA halflife for signal smoothing
+    "buffer_size": 2,           # Hysteresis buffer for turnover control
+    "label_horizon": 5,         # Forward return prediction horizon
+    "topk": 5,                  # Number of top ETFs to recommend
+    "regime_ma_window": 60,     # MA window for market regime filter
+}
+
 # Output Config
 import os
 OUTPUT_DIR = "artifacts"

@@ -6,7 +6,10 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from qlib.workflow import R
-from delorean.config import QLIB_PROVIDER_URI, QLIB_REGION, BENCHMARK, ETF_NAME_MAP
+from delorean.config import (
+    QLIB_PROVIDER_URI, QLIB_REGION, BENCHMARK, ETF_NAME_MAP, 
+    ETF_LIST, LIVE_TRADING_CONFIG
+)
 from delorean.data import ETFDataLoader
 from delorean.model import ModelTrainer
 from delorean.backtest import BacktestEngine
@@ -15,13 +18,16 @@ from qlib.data import D
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 
-def get_trading_signal(topk=5):
+def get_trading_signal(topk=None):
     """
     Generates trading signals for the latest available date.
     
     Args:
-        topk (int): Number of top ETFs to select.
+        topk (int): Number of top ETFs to select. Defaults to config value.
     """
+    # Use config defaults if not specified
+    if topk is None:
+        topk = LIVE_TRADING_CONFIG["topk"]
     # 1. Initialize Qlib
     qlib.init(provider_uri=QLIB_PROVIDER_URI, region=QLIB_REGION)
     
@@ -36,8 +42,10 @@ def get_trading_signal(topk=5):
     # =========================================================================
     print("\n[Phase 1/2] Out-of-Sample Validation (Recent 60 Days)...")
     
-    # Validation Split: Train on History[:-60], Test on History[-60:]
-    val_days = 60
+    # Validation Split: Train on History[:-val_days], Test on History[-val_days:]
+    val_days = LIVE_TRADING_CONFIG["validation_days"]
+    label_horizon = LIVE_TRADING_CONFIG["label_horizon"]
+    
     val_split_date = today - datetime.timedelta(days=val_days)
     val_train_end = (val_split_date - datetime.timedelta(days=1)).strftime("%Y-%m-%d")
     val_test_start = val_split_date.strftime("%Y-%m-%d")
@@ -46,7 +54,7 @@ def get_trading_signal(topk=5):
     print(f"  > Test (Validation) Data: {val_test_start} to Present")
     
     # Load Validation Data
-    data_loader_val = ETFDataLoader(label_horizon=5)
+    data_loader_val = ETFDataLoader(label_horizon=label_horizon)
     dataset_val = data_loader_val.load_data(train_end=val_train_end, test_start=val_test_start)
     
     # Train Validation Model
@@ -156,9 +164,10 @@ def get_trading_signal(topk=5):
     print("\n[Phase 2/2] Production Signal Generation (Full History)...")
 
     # Production Split: Train on ALL available history to predict Tomorrow.
-    # We stick to the robust 14-day split to ensure Qlib has a non-empty 'test' segment 
+    # We stick to the robust split to ensure Qlib has a non-empty 'test' segment 
     # for the most recent days, avoiding any empty-dataframe errors.
-    prod_split_date = today - datetime.timedelta(days=14)
+    prod_split_days = LIVE_TRADING_CONFIG["production_split_days"]
+    prod_split_date = today - datetime.timedelta(days=prod_split_days)
     prod_train_end = (prod_split_date - datetime.timedelta(days=1)).strftime("%Y-%m-%d")
     prod_test_start = prod_split_date.strftime("%Y-%m-%d")
 
@@ -166,7 +175,7 @@ def get_trading_signal(topk=5):
     print(f"  > Prediction Target: {prod_test_start} to Present")
     
     # Load Production Data
-    data_loader_prod = ETFDataLoader(label_horizon=5)
+    data_loader_prod = ETFDataLoader(label_horizon=label_horizon)
     dataset_prod = data_loader_prod.load_data(train_end=prod_train_end, test_start=prod_test_start)
     
     # Train Production Model
@@ -179,14 +188,15 @@ def get_trading_signal(topk=5):
     pred_prod = model_prod.predict(dataset_prod)
     
     # Signal Smoothing (EWMA)
-    print("  > Applying 15-day EWMA Smoothing...")
+    smooth_window = LIVE_TRADING_CONFIG["smooth_window"]
+    print(f"  > Applying {smooth_window}-day EWMA Smoothing...")
     if pred_prod.index.names[1] == 'instrument':
         level_name = 'instrument'
     else:
         level_name = pred_prod.index.names[1]
         
     pred_smooth = pred_prod.groupby(level=level_name).apply(
-        lambda x: x.ewm(halflife=15, min_periods=1).mean()
+        lambda x: x.ewm(halflife=smooth_window, min_periods=1).mean()
     )
     
     # Clean Index
@@ -205,7 +215,6 @@ def get_trading_signal(topk=5):
     
     # --- Market Regime Check (Global HS300) ---
     print("\n[Market Regime Check] Global HS300 Filter (Price > MA60)...")
-    from delorean.config import BENCHMARK, ETF_LIST, ETF_NAME_MAP
     
     # 1. Fetch Benchmark Data
     bench_df = D.features([BENCHMARK], ['$close'], start_time=latest_date, end_time=latest_date)
@@ -227,11 +236,12 @@ def get_trading_signal(topk=5):
                  print(f"  [BULL CONFIRMED] HS300 Close ({bench_close:.2f}) > MA60 ({bench_ma60:.2f}). Trade On.")
     
     # [NEW] Configuration Artifact
+    buffer_size = LIVE_TRADING_CONFIG["buffer_size"]
     strategy_config = {
         "topk": topk,
-        "smooth_window": 15,
-        "buffer": 2,
-        "label_horizon": 5,
+        "smooth_window": smooth_window,
+        "buffer": buffer_size,
+        "label_horizon": label_horizon,
         "mode": "Equal Weight + Global HS300 Filter"
     }
 
@@ -275,8 +285,7 @@ def get_trading_signal(topk=5):
 
     if is_bull:
         # Bull Market: Top K + Buffer
-        # We include topk + 2 items. The extra 2 are "buffer" items.
-        buffer_size = 2
+        # We include topk + buffer_size items. The extra items are "buffer" items.
         for i, (symbol, score) in enumerate(latest_pred.head(topk + buffer_size).items(), 1):
              vol_raw = vol_map.get(symbol, 0.0)
              close_price = close_map.get(symbol, 0.0)
@@ -332,8 +341,8 @@ def get_trading_signal(topk=5):
     
     print("\n[Strategy Note]")
     print(f"- Target Hold: Top {topk}")
-    print(f"- Buffer Logic (Hysteresis): Keep existing holdings if Rank <= {topk+2}.")
-    print(f"- Turnover Control: Only swap if Rank > {topk+2}.")
+    print(f"- Buffer Logic (Hysteresis): Keep existing holdings if Rank <= {topk + buffer_size}.")
+    print(f"- Turnover Control: Only swap if Rank > {topk + buffer_size}.")
     print("- Regime Filter: If Bear Market Warning above, prefer CASH.")
 
 if __name__ == "__main__":
