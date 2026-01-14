@@ -28,19 +28,25 @@ class ETFDataHandler(DataHandlerLP):
             "4 * Std($close, 20) / Mean($close, 20)",      # BB_Width_Norm
             "(3 * Mean(If($high > Ref($close, 1), $high, Ref($close, 1)) - If($low < Ref($close, 1), $low, Ref($close, 1)), 20)) / Mean($close, 20)", # KC_Width_Norm
             "(4 * Std($close, 20)) / (3 * Mean(If($high > Ref($close, 1), $high, Ref($close, 1)) - If($low < Ref($close, 1), $low, Ref($close, 1)), 20))", # Squeeze_Ratio
+            "( ($close / Ref($close, 20) - 1) / Std($close, 20) )", # New: Vol-Adj Momentum
+            "-1 * ($close - 2*Ref($close, 5) + Ref($close, 10))",   # New: Reversal on Acceleration
+            "-1 * ( ($close/Ref($close, 5)) / ($close/Ref($close, 20)) )", # New: Reversal on Short/Long Momentum Ratio
         ]
         
         custom_names = [
-            "MarketCap_Liquidity",
-            "MOM60",
-            "MOM120",
-            "REV5",
-            "VOL20",
-            "VOL60",
-            "VOL120",
-            "BB_Width_Norm",
-            "KC_Width_Norm",
-            "Squeeze_Ratio",
+             "MarketCap_Liquidity",
+             "MOM60",
+             "MOM120",
+             "REV5",
+             "VOL20",
+             "VOL60",
+             "VOL120",
+             "BB_Width_Norm",
+             "KC_Width_Norm",
+             "Squeeze_Ratio",
+             "Mom20_VolAdj",
+             "Accel_Rev",
+             "ROC_Rev",
         ]
         return custom_exprs, custom_names
 

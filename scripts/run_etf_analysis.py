@@ -5,7 +5,7 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from delorean.config import QLIB_PROVIDER_URI, QLIB_REGION, BENCHMARK, START_TIME, END_TIME, DEFAULT_EXPERIMENT_NAME
+from delorean.config import QLIB_PROVIDER_URI, QLIB_REGION, BENCHMARK, START_TIME, END_TIME, DEFAULT_EXPERIMENT_NAME, TEST_START_TIME, TRAIN_END_TIME
 from delorean.data import ETFDataLoader
 from delorean.model import ModelTrainer
 from delorean.backtest import BacktestEngine
@@ -171,7 +171,7 @@ def main() -> None:
         
         # [FIX] Enforce Test Range Slicing
         # Ensure backtest only runs on the requested test period
-        test_start = args.test_start_time if args.test_start_time else START_TIME
+        test_start = args.test_start_time if args.test_start_time else TEST_START_TIME
         test_end = args.end_time if args.end_time else END_TIME
         
         print(f"Enforcing Backtest Range: {test_start} to {test_end}")
@@ -244,7 +244,6 @@ def main() -> None:
         )
         
         # Log key backtest metrics to MLflow
-        # Log key backtest metrics to MLflow
         try:
             from qlib.contrib.evaluate import risk_analysis
             # Ensure report is a DataFrame and has 'return'
@@ -257,6 +256,8 @@ def main() -> None:
                 
                 # Calculate Rank IC from predictions
                 from delorean.utils import calculate_rank_ic
+                
+                # Use 'test' segment labels
                 labels = dataset.prepare("test", col_set="label", data_key="infer")
                 rank_ic = calculate_rank_ic(pred, labels)
                 

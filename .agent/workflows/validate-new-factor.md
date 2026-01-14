@@ -40,7 +40,7 @@ This workflow guides you through the process of taking a newly discovered factor
    
    **Option A: Standard (Regime Filter ON)**
    ```bash
-   cd /Users/taotao/workspace/delorean && conda run -n quant python scripts/run_etf_analysis.py \
+   cd /Users/jinjing/workspace/delorean && conda run -n quant python scripts/run_etf_analysis.py \
      --start_time 2015-01-01 \
      --end_time 2023-12-31 \
      --train_end_time 2020-12-31 \
@@ -49,7 +49,7 @@ This workflow guides you through the process of taking a newly discovered factor
 
    **Option B: Raw Alpha Power (Regime Filter OFF)**
    ```bash
-   cd /Users/taotao/workspace/delorean && conda run -n quant python scripts/run_etf_analysis.py \
+   cd /Users/jinjing/workspace/delorean && conda run -n quant python scripts/run_etf_analysis.py \
      --no_regime \
      --start_time 2015-01-01 \
      --end_time 2023-12-31 \
