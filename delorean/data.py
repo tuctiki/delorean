@@ -33,7 +33,8 @@ class ETFDataHandler(DataHandlerLP):
             # Removed ROC_Rev (2026-01-14 Audit: No signal, IC=-0.001)
             # === VALIDATED FACTORS (Alpha Mining 2026-01-14) ===
             # Removed VolAdj_Mom_10 (2026-01-14 Audit: 0.98 correlation with Mom_Vol_Combo)
-            "($close / Ref($close, 10) - 1) * (1 / (Std($close / Ref($close, 1) - 1, 20) + 0.001))",  # Mom_Vol_Combo (IC=0.037, Alpha=12.9%)
+            # Replaced Mom_Vol_Combo with Trend_Efficiency (Round 3 Validated OOS IC=0.034)
+            "($close / Ref($close, 20) - 1) / (Std($close / Ref($close, 1) - 1, 20) + 0.0001)", # Trend_Efficiency (Risk-Adj Mom 20d)
             "($close - $open) / (Abs($open - Ref($close, 1)) + 0.001)",  # Gap_Fill (IC=0.032, unique)
         ]
         
@@ -47,7 +48,7 @@ class ETFDataHandler(DataHandlerLP):
              "Accel_Rev",
              # Removed ROC_Rev (Audit: No signal)
              # Optimized validated factors (removed VolAdj_Mom_10 due to 0.98 correlation)
-             "Mom_Vol_Combo",
+             "Trend_Efficiency",
              "Gap_Fill",
         ]
         return custom_exprs, custom_names

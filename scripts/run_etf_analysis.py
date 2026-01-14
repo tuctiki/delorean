@@ -37,7 +37,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--test_start_time", type=str, default=None, help="Test Start Time (e.g. 2022-01-01)")
     parser.add_argument("--end_time", type=str, default=None, help="Backtest End Time (e.g. 2025-12-31)")
     parser.add_argument("--experiment_name", type=str, default=None, help="Custom MLflow Experiment Name")
-    parser.add_argument("--no_regime", action="store_true", help="Disable Market Regime Filter (Stress Test)")
+    parser.add_argument("--use_regime", action="store_true", help="Enable Market Regime Filter (Default: Disabled)")
     
     return parser.parse_args()
 
@@ -157,7 +157,7 @@ def main() -> None:
         # --- Market Regime Filter ---
         print("Calculating Market Regime Signal (HS300 MA60)...")
         
-        if args.no_regime:
+        if not args.use_regime:
             print("Market Regime Filter: DISABLED (Forced Bull)")
             market_regime = None
         else:

@@ -127,8 +127,8 @@ def run_backtest(background_tasks: BackgroundTasks):
     cmd.extend(["--start_time", DEFAULT_BACKTEST_PARAMS["start_time"]])
     cmd.extend(["--train_end_time", DEFAULT_BACKTEST_PARAMS["train_end_time"]])
     cmd.extend(["--test_start_time", DEFAULT_BACKTEST_PARAMS["test_start_time"]])
-    if DEFAULT_BACKTEST_PARAMS.get("no_regime"):
-        cmd.append("--no_regime")
+    if DEFAULT_BACKTEST_PARAMS.get("use_regime"):
+        cmd.append("--use_regime")
     
     BACKTEST_PROCESS = subprocess.Popen(
         cmd,

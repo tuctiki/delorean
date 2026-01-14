@@ -325,10 +325,26 @@ def get_trading_signal(topk: int = None) -> None:
     # Market regime check
     latest_date = pred_smooth.index.get_level_values('datetime').max()
     print("\n[Market Regime Check] Global HS300 Filter...")
-    is_bull, market_data = get_current_regime(latest_date)
     
-    status = "BULL" if is_bull else "BEAR"
-    print(f"  [{status}] Close: {market_data['benchmark_close']:.2f}, MA{market_data['ma_window']}: {market_data['benchmark_ma']:.2f}")
+    is_bull = True # Default to Bull (Always Trade)
+    market_data = {
+        "benchmark_close": 0.0, 
+        "benchmark_ma": 0.0, 
+        "ma_window": config.get("regime_ma_window", 60)
+    }
+
+    if config.get("use_regime_filter", True):
+        is_bull, market_data = get_current_regime(latest_date)
+        status = "BULL" if is_bull else "BEAR"
+        print(f"  [Status: ENABLED] Result: {status} (Close: {market_data['benchmark_close']:.2f}, MA{market_data['ma_window']}: {market_data['benchmark_ma']:.2f})")
+    else:
+        # Still fetch data for reporting if possible, but force Bull
+        try:
+             _, real_market_data = get_current_regime(latest_date)
+             market_data = real_market_data
+        except Exception as e:
+             pass
+        print(f"  [Status: DISABLED] Forcing BULL market state (Close: {market_data.get('benchmark_close', 0.0):.2f})")
     
     # Build and save artifact
     artifact = build_recommendation_artifact(

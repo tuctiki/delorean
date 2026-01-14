@@ -56,7 +56,7 @@ DEFAULT_BACKTEST_PARAMS = {
     "start_time": "2015-01-01",
     "train_end_time": "2022-12-31",
     "test_start_time": "2023-01-01",
-    "no_regime": True,
+    "use_regime": False,
 }
 
 # Live Trading Configuration (used by run_live_trading.py)
@@ -68,6 +68,7 @@ LIVE_TRADING_CONFIG = {
     "label_horizon": 5,         # Forward return prediction horizon
     "topk": 5,                  # Number of top ETFs to recommend
     "regime_ma_window": 60,     # MA window for market regime filter
+    "use_regime_filter": False, # Market Regime Filter (False = OFF by default)
 }
 
 # Output Config
