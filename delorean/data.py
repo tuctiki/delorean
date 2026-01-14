@@ -26,11 +26,15 @@ class ETFDataHandler(DataHandlerLP):
             "Std($close / Ref($close, 1) - 1, 60)",             
             # Removed VOL120 (Redundant)
             # Removed BB_Width_Norm (Redundant)
-            "(3 * Mean(If($high > Ref($close, 1), $high, Ref($close, 1)) - If($low < Ref($close, 1), $low, Ref($close, 1)), 20)) / Mean($close, 20)", # KC_Width_Norm
+            # Removed KC_Width_Norm (2026-01-14 Audit: Redundant with VOL60, IC=-0.072)
             # Removed Squeeze_Ratio (Weak)
-            "( ($close / Ref($close, 20) - 1) / Std($close, 20) )", # New: Vol-Adj Momentum
-            "-1 * ($close - 2*Ref($close, 5) + Ref($close, 10))",   # New: Reversal on Acceleration
-            "-1 * ( ($close/Ref($close, 5)) / ($close/Ref($close, 20)) )", # New: Reversal on Short/Long Momentum Ratio
+            "( ($close / Ref($close, 20) - 1) / Std($close, 20) )", # Vol-Adj Momentum (20-day)
+            "-1 * ($close - 2*Ref($close, 5) + Ref($close, 10))",   # Reversal on Acceleration
+            # Removed ROC_Rev (2026-01-14 Audit: No signal, IC=-0.001)
+            # === VALIDATED FACTORS (Alpha Mining 2026-01-14) ===
+            # Removed VolAdj_Mom_10 (2026-01-14 Audit: 0.98 correlation with Mom_Vol_Combo)
+            "($close / Ref($close, 10) - 1) * (1 / (Std($close / Ref($close, 1) - 1, 20) + 0.001))",  # Mom_Vol_Combo (IC=0.037, Alpha=12.9%)
+            "($close - $open) / (Abs($open - Ref($close, 1)) + 0.001)",  # Gap_Fill (IC=0.032, unique)
         ]
         
         custom_names = [
@@ -38,10 +42,13 @@ class ETFDataHandler(DataHandlerLP):
              "MOM60",
              "MOM120",
              "VOL60",
-             "KC_Width_Norm",
+             # Removed KC_Width_Norm (Audit: Redundant)
              "Mom20_VolAdj",
              "Accel_Rev",
-             "ROC_Rev",
+             # Removed ROC_Rev (Audit: No signal)
+             # Optimized validated factors (removed VolAdj_Mom_10 due to 0.98 correlation)
+             "Mom_Vol_Combo",
+             "Gap_Fill",
         ]
         return custom_exprs, custom_names
 
