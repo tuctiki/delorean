@@ -1,4 +1,4 @@
-git+https://github.com/microsoft/qlib.git
+pyqlib==0.9.7
 akshare
 pandas>=2.0.0
 numpy<2.0.0
@@ -10,3 +10,4 @@ uvicorn
 mlflow
 scikit-learn
 matplotlib
+gplearn

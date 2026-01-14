@@ -10,23 +10,23 @@ def test_custom_factors_structure():
     assert isinstance(exprs, list)
     assert isinstance(names, list)
     assert len(exprs) == len(names)
-    assert "VOL20" in names
+    assert len(names) == 8, f"Expected 8 factors, got {len(names)}"
     
 def test_custom_factors_contains_expected_factors():
-    """Test that all expected factor names are present."""
+    """Test that all expected factor names are present (2026-01-14 Optimized 8-Factor Library)."""
     _, names = ETFDataHandler.get_custom_factors()
     
+    # Updated to match the optimized 8-factor library after 2026-01-14 audit
+    # Removed: REV5, VOL20, VOL120, BB_Width_Norm, KC_Width_Norm, Squeeze_Ratio, ROC_Rev, VolAdj_Mom_10
     expected_factors = [
         "MarketCap_Liquidity",
         "MOM60",
         "MOM120", 
-        "REV5",
-        "VOL20",
         "VOL60",
-        "VOL120",
-        "BB_Width_Norm",
-        "KC_Width_Norm",
-        "Squeeze_Ratio",
+        "Mom20_VolAdj",
+        "Accel_Rev",
+        "Trend_Efficiency",
+        "Gap_Fill",
     ]
     
     for factor in expected_factors:

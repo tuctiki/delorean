@@ -9,8 +9,19 @@ description = "A project for quantitative financial analysis."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "akshare",
     "pyqlib==0.9.7",
+    "akshare",
+    "pandas>=2.0.0",
+    "numpy<2.0.0",
+    "lightgbm",
+    "torch",
+    "gymnasium",
+    "fastapi",
+    "uvicorn",
+    "mlflow",
+    "scikit-learn",
+    "matplotlib",
+    "gplearn",
 ]
 classifiers = [
     "Programming Language :: Python :: 3",
