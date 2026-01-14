@@ -12,6 +12,8 @@ from delorean.backtest import BacktestEngine
 from delorean.analysis import ResultAnalyzer, FactorAnalyzer
 from delorean.experiment_manager import ExperimentManager
 from delorean.feature_selection import FeatureSelector
+from delorean.signals import smooth_predictions
+from delorean.regime import calculate_regime_series
 from qlib.workflow import R
 
 def parse_args() -> argparse.Namespace:
@@ -148,61 +150,24 @@ def main() -> None:
             # feature_imp_opt = model_trainer.get_feature_importance(dataset)
             # print("\nTop 10 Feature Importance (Stage 2):\n", feature_imp_opt.head(10))
 
-        # Signal Smoothing
-        print("Applying 10-day EWMA Signal Smoothing...")
-        # Check index names (usually datetime, instrument)
-        if pred.index.names[1] == 'instrument':
-            level_name = 'instrument'
-        else:
-            level_name = pred.index.names[1]
-            
-        # EWMA Smoothing (Halflife=args.smooth_window days)
-        # Note: groupby(level=...).apply(...) often prepends the group key to the index.
-        # Original index: (datetime, instrument)
-        # Result index: (instrument, datetime, instrument) -> we need to drop top level.
-        # 2. Time-Series Smoothing (EWMA on Raw Scores)
-        # Reverting to Raw Score + EWMA (Apex Config).
-        # Rank smoothing removed to preserve magnitude signal.
+        # Signal Smoothing using shared module
         print(f"Applying {args.smooth_window}-day EWMA Signal Smoothing...")
-        pred = pred.groupby(level=level_name).apply(
-            lambda x: x.ewm(halflife=args.smooth_window, min_periods=1).mean()
-        )
-        
-        # Remove redundant level 0 if added
-        if pred.index.nlevels > 2:
-            pred = pred.droplevel(0)
-            
-        # Ensure (datetime, instrument) order
-        if pred.index.names[0] != 'datetime' and 'datetime' in pred.index.names:
-             pred = pred.swaplevel()
-             
-        # Safe Sort by datetime
-        pred = pred.dropna().sort_index()
+        pred = smooth_predictions(pred, halflife=args.smooth_window)
 
-        # --- Market Regime Filter (MA200) ---
-        print("Calculating Market Regime Signal (HS300 MA200)...")
-        from qlib.data import D
-        # Note: BENCHMARK, START_TIME, END_TIME already imported at module level
+        # --- Market Regime Filter ---
+        print("Calculating Market Regime Signal (HS300 MA60)...")
         
-        # Load Benchmark Close Price
-        # D.features returns MultiIndex (instrument, datetime)
-        bench_df = D.features([BENCHMARK], ['$close'], start_time=START_TIME, end_time=END_TIME)
-        
-        # Compute MA200
-        # Reset index to get 'datetime' as column or index level for easier handling
-        bench_close = bench_df.droplevel(0) # Drop instrument level, now index is datetime
-        bench_close.columns = ['close']
-        
-        # Calculate Moving Average (MA60 for faster response)
-        bench_close['ma60'] = bench_close['close'].rolling(window=60).mean()
-        
-        # Define Regime: True = Bull (Close > MA60), False = Bear (Close <= MA60)
         if args.no_regime:
             print("Market Regime Filter: DISABLED (Forced Bull)")
             market_regime = None
         else:
-            print(f"Market Regime Filter: ENABLED (Close > MA60)")
-            market_regime = bench_close['close'] > bench_close['ma60']
+            print("Market Regime Filter: ENABLED (Close > MA60)")
+            market_regime = calculate_regime_series(
+                benchmark=BENCHMARK,
+                start_time=START_TIME,
+                end_time=END_TIME,
+                ma_window=60
+            )
         
         # [FIX] Enforce Test Range Slicing
         # Ensure backtest only runs on the requested test period
