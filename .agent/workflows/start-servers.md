@@ -17,12 +17,12 @@ This workflow starts both the FastAPI backend and Next.js frontend servers.
 
 1. Start the backend server (FastAPI on port 8000):
 ```bash
-cd /Users/jinjing/workspace/delorean && conda run -n quant python server/main.py
+lsof -ti:8000 | xargs kill -9 2>/dev/null || true && cd /Users/jinjing/workspace/delorean && conda run -n quant python server/main.py
 ```
 
 2. Start the frontend server (Next.js on port 3000):
 ```bash
-cd /Users/jinjing/workspace/delorean/frontend && npm run dev
+lsof -ti:3000 | xargs kill -9 2>/dev/null || true && cd /Users/jinjing/workspace/delorean/frontend && npm run dev
 ```
 
 ## Access Points
