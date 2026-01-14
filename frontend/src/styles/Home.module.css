@@ -33,6 +33,10 @@
   grid-column: span 3;
 }
 
+.col12 {
+  grid-column: span 12;
+}
+
 @media (max-width: 900px) {
 
   .col8,
@@ -237,4 +241,8 @@
   text-transform: uppercase;
   letter-spacing: 0.05em;
   opacity: 0.8;
-}.listHeader { white-space: nowrap; }
+}
+
+.listHeader {
+  white-space: nowrap;
+}
