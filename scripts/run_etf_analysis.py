@@ -182,7 +182,7 @@ def main() -> None:
         # --- Market Regime Filter (MA200) ---
         print("Calculating Market Regime Signal (HS300 MA200)...")
         from qlib.data import D
-        from delorean.config import BENCHMARK, START_TIME, END_TIME
+        # Note: BENCHMARK, START_TIME, END_TIME already imported at module level
         
         # Load Benchmark Close Price
         # D.features returns MultiIndex (instrument, datetime)

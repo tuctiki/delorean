@@ -56,6 +56,10 @@ class DailyArtifact(BaseModel):
 TASK_PROCESS: Optional[subprocess.Popen] = None
 TASK_LOG_FILE = "daily_task.log"
 
+# Global state for backtest task
+BACKTEST_PROCESS: Optional[subprocess.Popen] = None
+BACKTEST_LOG_FILE = "backtest_task.log"
+
 @app.get("/api/status")
 def get_status():
     global TASK_PROCESS
@@ -105,6 +109,70 @@ def run_daily_task(background_tasks: BackgroundTasks):
     # Use standard python command
     TASK_PROCESS = subprocess.Popen(
         [sys.executable, "-u", "scripts/run_daily_task.py"],
+        cwd=project_root, 
+        stdout=log_file,
+        stderr=subprocess.STDOUT
+    )
+    return {"status": "started"}
+
+@app.get("/api/backtest-status")
+def get_backtest_status():
+    """Get the status and log of the backtest task."""
+    global BACKTEST_PROCESS
+    is_running = False
+    exit_code = None
+    
+    if BACKTEST_PROCESS:
+        ret = BACKTEST_PROCESS.poll()
+        if ret is None:
+            is_running = True
+        else:
+            exit_code = ret
+            BACKTEST_PROCESS = None  # Cleanup
+            
+    # Read log tail
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    log_path = os.path.join(project_root, BACKTEST_LOG_FILE)
+    log_content = ""
+    if os.path.exists(log_path):
+        with open(log_path, "r") as f:
+            try:
+                f.seek(0, os.SEEK_END)
+                size = f.tell()
+                f.seek(max(size - 8000, 0))
+                log_content = f.read()
+            except Exception:
+                pass
+            
+    return {
+        "running": is_running,
+        "exit_code": exit_code,
+        "log": log_content
+    }
+
+@app.post("/api/run-backtest")
+def run_backtest(background_tasks: BackgroundTasks):
+    """Start a default backtest using run_etf_analysis.py."""
+    global BACKTEST_PROCESS
+    
+    if BACKTEST_PROCESS and BACKTEST_PROCESS.poll() is None:
+        return {"status": "already_running"}
+        
+    # Start process
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    log_path = os.path.join(project_root, BACKTEST_LOG_FILE)
+    log_file = open(log_path, "w")
+    
+    # Run the ETF analysis script with configured time parameters
+    # Training: 2015-01-01 to 2022-12-31, Validation: 2023-01-01 onwards
+    BACKTEST_PROCESS = subprocess.Popen(
+        [
+            sys.executable, "-u", "scripts/run_etf_analysis.py",
+            "--start_time", "2015-01-01",
+            "--train_end_time", "2022-12-31",
+            "--test_start_time", "2023-01-01",
+            "--no_regime",
+        ],
         cwd=project_root, 
         stdout=log_file,
         stderr=subprocess.STDOUT
@@ -211,11 +279,51 @@ def list_experiments():
 
 @app.get("/api/experiment_results")
 def get_experiment_results():
+    """
+    Get latest backtest results, normalizing field names for frontend.
+    """
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     path = os.path.join(root, "artifacts", "experiment_results.json")
     if os.path.exists(path):
         with open(path, "r") as f:
-            return json.load(f)
+            data = json.load(f)
+        
+        # Normalize field names to match frontend expectations
+        normalized = {
+            "sharpe": data.get("sharpe_ratio"),
+            "annualized_return": data.get("annual_return"),
+            "max_drawdown": data.get("max_drawdown"),
+            "win_rate": data.get("win_rate"),
+            "description": "Latest Backtest",
+            "period": data.get("timestamp", "N/A"),
+        }
+        
+        # Load chart data from backtest report if available
+        report_path = os.path.join(root, "artifacts", "backtest_report.pkl")
+        if os.path.exists(report_path):
+            try:
+                report = pd.read_pickle(report_path)
+                # Create chart data with cumulative returns
+                cum_return = (1 + report["return"]).cumprod()
+                bench_cum = (1 + report["bench"]).cumprod()
+                
+                chart_data = []
+                for idx in cum_return.index:
+                    date_str = idx.strftime("%Y-%m-%d") if hasattr(idx, 'strftime') else str(idx)
+                    chart_data.append({
+                        "date": date_str,
+                        "strategy": round(float(cum_return.loc[idx]), 4),
+                        "benchmark": round(float(bench_cum.loc[idx]), 4)
+                    })
+                # Sample to reduce data points for frontend performance
+                if len(chart_data) > 200:
+                    step = len(chart_data) // 200
+                    chart_data = chart_data[::step]
+                normalized["chart_data"] = chart_data
+            except Exception as e:
+                print(f"Error loading chart data: {e}")
+        
+        return normalized
     return {}
 
 @app.get("/api/experiments/{run_id}")

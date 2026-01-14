@@ -1,14 +1,57 @@
+import { useState, useEffect } from 'react';
 import useSWR from 'swr';
 import Link from 'next/link';
-import { Layers, FileText, TrendingUp, ArrowLeft } from 'lucide-react';
+import { Layers, FileText, TrendingUp, Play, Loader2 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import styles from '../../styles/Experiments.module.css';
 
 const fetcher = (...args) => fetch(...args).then(res => res.json());
 
 export default function Experiments() {
-    const { data: experiments, error: expError } = useSWR('http://localhost:8000/api/experiments', fetcher);
-    const { data: results, error: resultsError } = useSWR('http://localhost:8000/api/experiment_results', fetcher);
+    const { data: experiments, error: expError, mutate: mutateExperiments } = useSWR('http://localhost:8000/api/experiments', fetcher);
+    const { data: results, error: resultsError, mutate: mutateResults } = useSWR('http://localhost:8000/api/experiment_results', fetcher);
+
+    const [backtestRunning, setBacktestRunning] = useState(false);
+    const [backtestLog, setBacktestLog] = useState('');
+    const [showLog, setShowLog] = useState(false);
+
+    // Poll backtest status when running
+    useEffect(() => {
+        if (!backtestRunning) return;
+
+        const interval = setInterval(async () => {
+            try {
+                const res = await fetch('http://localhost:8000/api/backtest-status');
+                const data = await res.json();
+                setBacktestLog(data.log || '');
+
+                if (!data.running) {
+                    setBacktestRunning(false);
+                    // Refresh experiments and results after backtest completes
+                    mutateExperiments();
+                    mutateResults();
+                }
+            } catch (e) {
+                console.error('Failed to poll backtest status:', e);
+            }
+        }, 2000);
+
+        return () => clearInterval(interval);
+    }, [backtestRunning, mutateExperiments, mutateResults]);
+
+    const handleRunBacktest = async () => {
+        try {
+            const res = await fetch('http://localhost:8000/api/run-backtest', { method: 'POST' });
+            const data = await res.json();
+            if (data.status === 'started' || data.status === 'already_running') {
+                setBacktestRunning(true);
+                setShowLog(true);
+                setBacktestLog('Starting backtest...');
+            }
+        } catch (e) {
+            console.error('Failed to start backtest:', e);
+        }
+    };
 
     return (
         <div style={{ padding: '20px', maxWidth: '1400px', margin: '0 auto' }}>
@@ -22,9 +65,74 @@ export default function Experiments() {
                 padding: '20px',
                 marginBottom: '30px'
             }}>
-                <h2 style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
-                    <TrendingUp size={22} color="#58a6ff" /> Latest Backtest Performance
-                </h2>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                    <h2 style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: 0 }}>
+                        <TrendingUp size={22} color="#58a6ff" /> Latest Backtest Performance
+                    </h2>
+                    <button
+                        onClick={handleRunBacktest}
+                        disabled={backtestRunning}
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            padding: '10px 20px',
+                            background: backtestRunning ? '#21262d' : 'linear-gradient(135deg, #238636 0%, #2ea043 100%)',
+                            border: 'none',
+                            borderRadius: '6px',
+                            color: backtestRunning ? '#8b949e' : '#fff',
+                            fontWeight: 600,
+                            fontSize: '0.9rem',
+                            cursor: backtestRunning ? 'not-allowed' : 'pointer',
+                            transition: 'all 0.2s ease',
+                            boxShadow: backtestRunning ? 'none' : '0 4px 12px rgba(35, 134, 54, 0.4)'
+                        }}
+                    >
+                        {backtestRunning ? (
+                            <><Loader2 size={18} className="spin" style={{ animation: 'spin 1s linear infinite' }} /> Running...</>
+                        ) : (
+                            <><Play size={18} /> Run Backtest</>
+                        )}
+                    </button>
+                </div>
+
+                {/* Backtest Log Panel */}
+                {showLog && (
+                    <div style={{
+                        background: '#161b22',
+                        border: '1px solid #30363d',
+                        borderRadius: '6px',
+                        padding: '15px',
+                        marginBottom: '20px',
+                        maxHeight: '200px',
+                        overflow: 'auto'
+                    }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                            <span style={{ color: '#8b949e', fontSize: '0.85rem', fontWeight: 600 }}>
+                                {backtestRunning ? '⚡ Backtest Running...' : '✅ Backtest Complete'}
+                            </span>
+                            {!backtestRunning && (
+                                <button
+                                    onClick={() => setShowLog(false)}
+                                    style={{ background: 'none', border: 'none', color: '#8b949e', cursor: 'pointer', fontSize: '0.85rem' }}
+                                >
+                                    Dismiss
+                                </button>
+                            )}
+                        </div>
+                        <pre style={{
+                            margin: 0,
+                            fontSize: '0.75rem',
+                            color: '#7ee787',
+                            fontFamily: 'monospace',
+                            whiteSpace: 'pre-wrap',
+                            wordBreak: 'break-all'
+                        }}>
+                            {backtestLog || 'Waiting for output...'}
+                        </pre>
+                    </div>
+                )}
+
 
                 {results && Object.keys(results).length > 0 ? (
                     <>
