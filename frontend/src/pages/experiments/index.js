@@ -41,7 +41,7 @@ export default function Experiments() {
                         </div>
 
                         {/* Metrics Grid */}
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '15px', marginBottom: '25px' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '15px', marginBottom: '25px' }}>
                             <div style={{ background: '#161b22', padding: '15px', borderRadius: '6px', textAlign: 'center' }}>
                                 <div style={{ fontSize: '0.85rem', color: '#8b949e', marginBottom: '5px' }}>Sharpe Ratio</div>
                                 <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#58a6ff' }}>
@@ -64,6 +64,15 @@ export default function Experiments() {
                                 <div style={{ fontSize: '0.85rem', color: '#8b949e', marginBottom: '5px' }}>Win Rate</div>
                                 <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#c9d1d9' }}>
                                     {results.win_rate ? `${(results.win_rate * 100).toFixed(1)}%` : '-'}
+                                </div>
+                            </div>
+                            <div style={{ background: '#161b22', padding: '15px', borderRadius: '6px', textAlign: 'center' }}>
+                                <div style={{ fontSize: '0.85rem', color: '#8b949e', marginBottom: '5px' }}>Ann. Turnover</div>
+                                <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#f1c40f' }}>
+                                    {results.annualized_turnover ? `${(results.annualized_turnover * 100).toFixed(0)}%` : '-'}
+                                </div>
+                                <div style={{ fontSize: '0.7rem', color: '#8b949e', marginTop: '3px' }}>
+                                    {results.trading_days && results.total_days ? `${results.trading_days}/${results.total_days} days` : ''}
                                 </div>
                             </div>
                         </div>

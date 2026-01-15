@@ -75,6 +75,11 @@ def get_experiment_results_route():
             "annualized_return": data.get("annual_return"),
             "max_drawdown": data.get("max_drawdown"),
             "win_rate": data.get("win_rate"),
+            "daily_turnover": data.get("daily_turnover"),
+            "annualized_turnover": data.get("annualized_turnover"),
+            "trading_days": data.get("trading_days"),
+            "total_days": data.get("total_days"),
+            "trading_frequency": data.get("trading_frequency"),
             "description": "Latest Backtest",
             "period": data.get("timestamp", "N/A"),
         }
