@@ -138,21 +138,12 @@ Access at `http://localhost:5000`.
 The strategy utilizes a **Custom Factor Model** composed of **7 optimized factors** for the Chinese ETF market:
 
 > [!NOTE]
-> **2026-01-15 Optimization**: Reduced from 8 to 7 factors. Removed VOL60 (negative IC), Mom20_VolAdj and Accel_Rev (high correlation with new factors). Added Mom_Persistence and Acceleration from Round 4 alpha mining.
-
-#### Core Factors (2)
-1.  **MOM60**: `$close / Ref($close, 60) - 1` - Medium-term Momentum.
-2.  **MOM120**: `$close / Ref($close, 120) - 1` - Long-term Momentum.
-
-#### Validated Factors (5)
-3. **Trend_Efficiency**: `($close / Ref($close, 20) - 1) / (Std(...) + 0.0001)` - Risk-adjusted trend strength.
-4. **Gap_Fill**: `($close - $open) / (Abs($open - Ref($close, 1)) + 0.001)` - Gap filling tendency.
-5. **Mom_Persistence**: `Sum(If($close > Ref($close, 1), 1, 0), 10) / 10` - Momentum consistency.
 6. **Acceleration**: `($close / Ref($close, 5) - 1) - (Ref($close, 5) / Ref($close, 10) - 1)` - Price acceleration.
 7. **Vol_Price_Div**: `-1 * Corr($close / Ref($close, 1), $volume / Ref($volume, 1), 10)` - Price-Volume Divergence (New).
 
 ### ETF Universe (14 Assets)
 - **Broad Market**: CSI 300 (510300.SH), A500 (563360.SH), ChiNext (159915.SZ), STAR 50 (588000.SH), CSI 1000 (512100.SH)
+- **Global (Segregated)**: Nasdaq, S&P500, KWEB, HSI (Excluded from main A-share model).
 - **Sector**: Semiconductor (512480.SH), New Energy (516160.SH), Liquor (512690.SH), Bank (512800.SH), Pharma (512010.SH), Consumer (510630.SH), PV/Solar (515790.SH), Securities (512880.SH)
 - **Defensive**: Dividend RedChip (510880.SH)
 

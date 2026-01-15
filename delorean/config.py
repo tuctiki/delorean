@@ -11,11 +11,11 @@ ETF_LIST = [
     "510050.SH",    # 新增：上证50 (Large Cap Value)
     "510900.SH",    # 新增：H股ETF (H-Share)
     
-    # Global / QDII
-    "513050.SH",    # 新增：中概互联 (KWEB)
-    "513100.SH",    # 新增：纳指100 (Nasdaq 100)
-    "513500.SH",    # 新增：标普500 (S&P 500)
-    "159920.SZ",    # 新增：恒生ETF (HSI)
+    # Global / QDII (Available but segregated from main model)
+    # "513050.SH",    # KWEB
+    # "513100.SH",    # Nasdaq 100
+    # "513500.SH",    # S&P 500
+    # "159920.SZ",    # HSI
     
     # Commodities
     "518880.SH",    # 新增：黄金ETF (Gold)

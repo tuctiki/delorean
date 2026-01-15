@@ -15,14 +15,13 @@ class ETFDataHandler(DataHandlerLP):
     @staticmethod
     def get_custom_factors():
         """
-        Returns a tuple of (expressions, names) for the custom ETF factors.
-        Optimized 7-factor library after 2026-01-14 audit.
-        """
+    Returns a tuple of (expressions, names) for the custom ETF factors.
+    Optimized 6-factor library (tested consolidation, kept separate MOM factors).
+    """
         custom_exprs = [
             "$close / Ref($close, 60) - 1",                     # MOM60
             "$close / Ref($close, 120) - 1",                    # MOM120
             # === VALIDATED FACTORS ===
-            "($close / Ref($close, 20) - 1) / (Std($close / Ref($close, 1) - 1, 20) + 0.0001)", # Trend_Efficiency (IC=0.034)
             "($close - $open) / (Abs($open - Ref($close, 1)) + 0.001)",  # Gap_Fill (Structural)
             # === ROUND 5 FACTORS (Alpha Mining 2026-01-15) ===
             "Sum(If($close > Ref($close, 1), 1, 0), 10) / 10",  # Mom_Persistence (IC=0.059)
@@ -33,7 +32,6 @@ class ETFDataHandler(DataHandlerLP):
         custom_names = [
              "MOM60",
              "MOM120",
-             "Trend_Efficiency",
              "Gap_Fill",
              "Mom_Persistence",
              "Acceleration",
