@@ -14,7 +14,6 @@ from delorean.analysis import ResultAnalyzer, FactorAnalyzer
 from delorean.experiment_manager import ExperimentManager
 from delorean.feature_selection import FeatureSelector
 from delorean.signals import smooth_predictions
-from delorean.regime import calculate_regime_series
 from delorean.utils import fix_seed
 from qlib.workflow import R
 
@@ -39,7 +38,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--test_start_time", type=str, default=None, help="Test Start Time (e.g. 2022-01-01)")
     parser.add_argument("--end_time", type=str, default=None, help="Backtest End Time (e.g. 2025-12-31)")
     parser.add_argument("--experiment_name", type=str, default=None, help="Custom MLflow Experiment Name")
-    parser.add_argument("--use_regime", action="store_true", help="Enable Market Regime Filter (Default: Disabled)")
     
     return parser.parse_args()
 
@@ -138,21 +136,6 @@ def main() -> None:
         # Signal Smoothing using shared module
         print(f"Applying {args.smooth_window}-day EWMA Signal Smoothing...")
         pred = smooth_predictions(pred, halflife=args.smooth_window)
-
-        # --- Market Regime Filter ---
-        print("Calculating Market Regime Signal (HS300 MA60)...")
-        
-        if not args.use_regime:
-            print("Market Regime Filter: DISABLED (Forced Bull)")
-            market_regime = None
-        else:
-            print("Market Regime Filter: ENABLED (Close > MA60)")
-            market_regime = calculate_regime_series(
-                benchmark=BENCHMARK,
-                start_time=START_TIME,
-                end_time=END_TIME,
-                ma_window=60
-            )
         
         # [FIX] Enforce Test Range Slicing
         # Ensure backtest only runs on the requested test period
@@ -189,7 +172,6 @@ def main() -> None:
             "drop_rate": 0.96,
             "n_drop": 1,
             "buffer": args.buffer,
-            "market_regime": "MA60", # Descriptive for logging
             "risk_parity": args.risk_parity,
             "dynamic_exposure": args.dynamic_exposure
         }
@@ -211,16 +193,12 @@ def main() -> None:
                 print(f"Warning: Failed to fetch VOL20 data: {e}")
                 vol_feature = None
 
-        # Note: Dynamic exposure feature is handled via market_regime in BacktestEngine
-        # The bench_close variable was undefined here - removed dead code
-
-        # Pass updated robust params AND Market Regime (User Requested)
+        # Run Backtest
         report, positions = backtest_engine.run(
             topk=strategy_params["topk"], 
             drop_rate=strategy_params["drop_rate"], 
             n_drop=strategy_params["n_drop"], 
             buffer=strategy_params["buffer"],
-            market_regime=market_regime,
             vol_feature=vol_feature,
             start_time=test_start,
             end_time=None # Let Engine determine safe end date from sliced pred

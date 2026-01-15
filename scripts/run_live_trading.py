@@ -28,7 +28,6 @@ from delorean.data import ETFDataLoader
 from delorean.model import ModelTrainer
 from delorean.backtest import BacktestEngine
 from delorean.signals import smooth_predictions
-from delorean.regime import get_current_regime, get_regime_status_string
 
 
 def run_validation(today: datetime.datetime, config: dict) -> dict:
@@ -220,9 +219,8 @@ def build_recommendation_artifact(
     artifact = {
         "date": latest_date.strftime('%Y-%m-%d'),
         "generation_time": datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-        "market_status": get_regime_status_string(is_bull),
+        "market_status": "BULL (Always Invested)",
         "validation": validation_metrics,
-        "market_data": market_data,
         "strategy_config": strategy_config,
         "top_recommendations": [],
         "buffer_holdings": [],
@@ -292,8 +290,7 @@ def print_recommendations(pred: pd.Series, config: dict, is_bull: bool) -> None:
     print("\n[Strategy Note]")
     print(f"- Target Hold: Top {topk}")
     print(f"- Buffer Logic (Hysteresis): Keep existing holdings if Rank <= {topk + buffer_size}.")
-    print(f"- Turnover Control: Only swap if Rank > {topk + buffer_size}.")
-    print("- Regime Filter: If Bear Market Warning above, prefer CASH.")
+    print("- Turnover Control: Only swap if Rank > {topk + buffer_size}.")
 
 
 def get_trading_signal(topk: int = None) -> None:
@@ -322,33 +319,13 @@ def get_trading_signal(topk: int = None) -> None:
     # Phase 2: Production signals
     pred_smooth = generate_production_signal(today, config)
     
-    # Market regime check
-    latest_date = pred_smooth.index.get_level_values('datetime').max()
-    print("\n[Market Regime Check] Global HS300 Filter...")
-    
-    is_bull = True # Default to Bull (Always Trade)
-    market_data = {
-        "benchmark_close": 0.0, 
-        "benchmark_ma": 0.0, 
-        "ma_window": config.get("regime_ma_window", 60)
-    }
-
-    if config.get("use_regime_filter", True):
-        is_bull, market_data = get_current_regime(latest_date)
-        status = "BULL" if is_bull else "BEAR"
-        print(f"  [Status: ENABLED] Result: {status} (Close: {market_data['benchmark_close']:.2f}, MA{market_data['ma_window']}: {market_data['benchmark_ma']:.2f})")
-    else:
-        # Still fetch data for reporting if possible, but force Bull
-        try:
-             _, real_market_data = get_current_regime(latest_date)
-             market_data = real_market_data
-        except Exception as e:
-             pass
-        print(f"  [Status: DISABLED] Forcing BULL market state (Close: {market_data.get('benchmark_close', 0.0):.2f})")
+    # Market status (always bull, no regime filter)
+    print("\n[Market Status] Always invested (Regime Filter Removed)")
+    is_bull = True
     
     # Build and save artifact
     artifact = build_recommendation_artifact(
-        pred_smooth, is_bull, market_data, validation_metrics, config
+        pred_smooth, is_bull, {}, validation_metrics, config
     )
     
     with open("daily_recommendations.json", "w") as f:

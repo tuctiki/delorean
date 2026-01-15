@@ -56,19 +56,19 @@ DEFAULT_BACKTEST_PARAMS = {
     "start_time": "2015-01-01",
     "train_end_time": "2022-12-31",
     "test_start_time": "2023-01-01",
-    "use_regime": False,
+    "topk": 4,
+    "label_horizon": 1,
+    "smooth_window": 10,
 }
 
 # Live Trading Configuration (used by run_live_trading.py)
 LIVE_TRADING_CONFIG = {
     "validation_days": 60,      # Days for out-of-sample validation
     "production_split_days": 14, # Days for production signal split
-    "smooth_window": 15,        # EWMA halflife for signal smoothing
+    "smooth_window": 10,        # EWMA halflife for signal smoothing (Reduced from 15)
     "buffer_size": 2,           # Hysteresis buffer for turnover control
-    "label_horizon": 5,         # Forward return prediction horizon
-    "topk": 5,                  # Number of top ETFs to recommend
-    "regime_ma_window": 60,     # MA window for market regime filter
-    "use_regime_filter": True, # Market Regime Filter (True = ON by default for risk protection)
+    "label_horizon": 1,         # Forward return prediction horizon (Reduced from 5)
+    "topk": 4,                  # Number of top ETFs to recommend (Reduced from 5)
 }
 
 # Output Config

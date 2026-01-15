@@ -7,7 +7,7 @@ This helps assess whether performance is robust or just lucky with one seed.
 
 Usage:
     conda run -n quant python scripts/validate_multi_seed.py --seeds 5
-    conda run -n quant python scripts/validate_multi_seed.py --seeds 10 --use_regime
+    conda run -n quant python scripts/validate_multi_seed.py --seeds 10
 """
 
 import argparse
@@ -29,17 +29,15 @@ from delorean.data import ETFDataLoader
 from delorean.model import ModelTrainer
 from delorean.backtest import BacktestEngine
 from delorean.signals import smooth_predictions
-from delorean.regime import calculate_regime_series
 from delorean.utils import fix_seed, calculate_rank_ic
 from qlib.contrib.evaluate import risk_analysis
 
 
 def run_single_seed(
     seed: int,
-    use_regime: bool = True,
-    topk: int = 5,
-    label_horizon: int = 5,
-    smooth_window: int = 15,
+    topk: int = 4,
+    label_horizon: int = 1,
+    smooth_window: int = 10,
     train_end: str = TRAIN_END_TIME,
     test_start: str = TEST_START_TIME,
     verbose: bool = False
@@ -74,16 +72,6 @@ def run_single_seed(
     # Signal Smoothing
     pred = smooth_predictions(pred, halflife=smooth_window)
     
-    # Market Regime
-    market_regime = None
-    if use_regime:
-        market_regime = calculate_regime_series(
-            benchmark=BENCHMARK,
-            start_time=START_TIME,
-            end_time=END_TIME,
-            ma_window=60
-        )
-    
     # Slice predictions to test period
     ts_start = pd.Timestamp(test_start)
     max_data_date = pred.index.get_level_values('datetime').max()
@@ -96,7 +84,6 @@ def run_single_seed(
         drop_rate=0.96,
         n_drop=1,
         buffer=2,
-        market_regime=market_regime,
         start_time=test_start,
         end_time=None
     )
@@ -127,7 +114,6 @@ def run_single_seed(
 def run_multi_seed_validation(
     n_seeds: int = 5,
     seed_start: int = 1,
-    use_regime: bool = True,
     **kwargs
 ) -> pd.DataFrame:
     """
@@ -138,13 +124,12 @@ def run_multi_seed_validation(
     
     print(f"\n{'='*60}")
     print(f"Multi-Seed Validation: Testing {n_seeds} seeds")
-    print(f"Regime Filter: {'ON' if use_regime else 'OFF'}")
     print(f"{'='*60}\n")
     
     for i, seed in enumerate(seeds):
         print(f"[{i+1}/{n_seeds}] Running seed={seed}...", end=" ")
         try:
-            result = run_single_seed(seed=seed, use_regime=use_regime, **kwargs)
+            result = run_single_seed(seed=seed, **kwargs)
             results.append(result)
             print(f"Sharpe={result['sharpe']:.3f}, IC={result['rank_ic']:.4f}")
         except Exception as e:
@@ -213,10 +198,9 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Multi-Seed Validation")
     parser.add_argument("--seeds", type=int, default=5, help="Number of seeds to test")
     parser.add_argument("--seed_start", type=int, default=1, help="Starting seed value")
-    parser.add_argument("--use_regime", action="store_true", help="Enable regime filter")
-    parser.add_argument("--topk", type=int, default=5, help="TopK holdings")
-    parser.add_argument("--label_horizon", type=int, default=5, help="Label horizon days")
-    parser.add_argument("--smooth_window", type=int, default=15, help="Signal smoothing window")
+    parser.add_argument("--topk", type=int, default=4, help="TopK holdings")
+    parser.add_argument("--label_horizon", type=int, default=1, help="Label horizon days")
+    parser.add_argument("--smooth_window", type=int, default=10, help="Signal smoothing window")
     parser.add_argument("--output", type=str, default=None, help="Output CSV path")
     return parser.parse_args()
 
@@ -235,7 +219,6 @@ def main():
     df = run_multi_seed_validation(
         n_seeds=args.seeds,
         seed_start=args.seed_start,
-        use_regime=args.use_regime,
         topk=args.topk,
         label_horizon=args.label_horizon,
         smooth_window=args.smooth_window,

@@ -24,13 +24,12 @@ class SimpleTopkStrategy(BaseSignalStrategy):
                            User terminology: "dropout_rate" ~96% -> 96% chance keep old.
         n_drop (int): Maximum number of stocks to swap per trading step if trading occurs.
     """
-    def __init__(self, topk: int = 4, risk_degree: float = 0.95, drop_rate: float = 0.96, n_drop: int = 1, buffer: int = 2, market_regime: pd.Series = None, vol_feature: pd.Series = None, trend_feature: pd.Series = None, **kwargs: Any):
+    def __init__(self, topk: int = 4, risk_degree: float = 0.95, drop_rate: float = 0.96, n_drop: int = 1, buffer: int = 2, vol_feature: pd.Series = None, trend_feature: pd.Series = None, **kwargs: Any):
         super().__init__(risk_degree=risk_degree, **kwargs)
         self.topk = topk
         self.drop_rate = drop_rate
         self.n_drop = n_drop
         self.buffer = buffer
-        self.market_regime = market_regime
         self.vol_feature = vol_feature 
         self.trend_feature = trend_feature 
         
@@ -40,48 +39,13 @@ class SimpleTopkStrategy(BaseSignalStrategy):
 
     def generate_trade_decision(self, execute_result: Any = None) -> TradeDecisionWO:
         """
-        Generate trade orders with turnover control and market regime filter.
+        Generate trade orders with turnover control.
         """
         # 1. Get Trading Step and Time
         trade_step = self.trade_calendar.get_trade_step()
         trade_start_time, trade_end_time = self.trade_calendar.get_step_time(trade_step)
-
-        # 0. Market Regime (Per-Asset Trend Filter Logic remains here or moves to AlphaModel?)
-        # For now, keep high-level regime check here.
-        if self.market_regime is not None:
-             try:
-                is_bull = self.market_regime.loc[trade_start_time] if trade_start_time in self.market_regime.index else True
-             except Exception as e:
-                logger.debug(f"Market regime lookup failed for {trade_start_time}: {e}")
-                is_bull = True
-             
-             if not is_bull:
-                 # Standard Regime Filter: Sell All (Cash)
-                 # Generate sell orders for all holdings
-                 sell_order_list = []
-                 current_stock_list = self.trade_position.get_stock_list()
-                 for code in current_stock_list:
-                     if not self.trade_exchange.is_stock_tradable(
-                         stock_id=code,
-                         start_time=trade_start_time,
-                         end_time=trade_end_time,
-                         direction=OrderDir.SELL,
-                     ):
-                         continue
-                     sell_amount = self.trade_position.get_stock_amount(code=code)
-                     sell_order = Order(
-                         stock_id=code,
-                         amount=sell_amount,
-                         start_time=trade_start_time,
-                         end_time=trade_end_time,
-                         direction=Order.SELL,
-                     )
-                     if self.trade_exchange.check_order(sell_order):
-                         sell_order_list.append(sell_order)
-                 return TradeDecisionWO(sell_order_list, self)
         
-        # 0.5 Turnover control: Probabilistic Retention (Pre-check)
-        # Note: Ideally this should move to ExecutionModel too, but it short-circuits everything.
+        # Turnover control: Probabilistic Retention (Pre-check)
         current_risk_degree = self.risk_degree 
         current_holdings_list = self.trade_position.get_stock_list()
         should_force_trade = (len(current_holdings_list) == 0) and (current_risk_degree > 0)
@@ -163,13 +127,12 @@ class BacktestEngine:
         """
         self.pred = pred
 
-    def run(self, topk: int = 3, market_regime: pd.Series = None, start_time=None, end_time=None, use_trend_filter: bool = False, **kwargs: Any) -> Tuple[pd.DataFrame, Dict[Any, Any]]:
+    def run(self, topk: int = 3, start_time=None, end_time=None, use_trend_filter: bool = False, **kwargs: Any) -> Tuple[pd.DataFrame, Dict[Any, Any]]:
         """
         Run the backtest simulation.
 
         Args:
             topk (int): Number of stocks to hold in the TopK strategy.
-            market_regime (pd.Series): Boolean series (True=Bull, False=Bear) to filter trades.
             start_time (str|pd.Timestamp): Custom start time for backtest. Defaults to config.TEST_START_TIME.
             end_time (str|pd.Timestamp): Custom end time for backtest. Defaults to derived from data.
             use_trend_filter (bool): Whether to enable the per-asset trend filter (Default: False).
@@ -180,7 +143,7 @@ class BacktestEngine:
             and a dictionary of position details.
         """
 
-        print(f"\nRunning Backtest (Custom SimpleTopkStrategy, TopK={topk}, GlobalRegime={'On' if market_regime is not None else 'Off'}, PerAssetTrend={'On' if use_trend_filter else 'Off'}, Params={kwargs})...")
+        print(f"\nRunning Backtest (Custom SimpleTopkStrategy, TopK={topk}, PerAssetTrend={'On' if use_trend_filter else 'Off'}, Params={kwargs})...")
         # Fetch Trend Feature if needed
         trend_feature = None
         if use_trend_filter:
@@ -217,7 +180,6 @@ class BacktestEngine:
             "topk": topk,
             "risk_degree": 0.95,
             "signal": self.pred,
-            "market_regime": market_regime,
             "trend_feature": trend_feature,
             **kwargs # Pass drop_rate and n_drop
         }

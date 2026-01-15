@@ -21,7 +21,7 @@ cd /Users/jinjing/workspace/delorean && conda run -n quant python scripts/downlo
 
 2. Run the full history backtest (Train 2015-2021, Test 2022-Present):
 ```bash
-cd /Users/jinjing/workspace/delorean && conda run -n quant python scripts/run_etf_analysis.py --start_time 2015-01-01 --end_time 2025-12-31 --train_end_time 2021-12-31 --test_start_time 2022-01-01 --topk 5 --smooth_window 15 --label_horizon 5
+cd /Users/jinjing/workspace/delorean && conda run -n quant python scripts/run_etf_analysis.py --start_time 2015-01-01 --end_time 2025-12-31 --train_end_time 2021-12-31 --test_start_time 2022-01-01 --topk 4 --smooth_window 10 --label_horizon 1
 ```
 
 ## Output
@@ -31,7 +31,7 @@ cd /Users/jinjing/workspace/delorean && conda run -n quant python scripts/run_et
 
 ## Notes
 - The backtest uses the current strategy configuration from `delorean/config.py`
-- Default parameters: TopK=5, Smooth Window=15, Label Horizon=5
+- Optimized Parameters: TopK=4, Smooth Window=10, Label Horizon=1 (Daily Prediction)
 - Results will be visible in the Experiments page of the dashboard
 
 ## Alternative: Quick Validation Run

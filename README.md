@@ -185,7 +185,6 @@ All backtest runs are logged to the default experiment `ETF_Strategy` in `mlruns
 
 ## Frontend Features
 -   **Experiment Visuals**: Detailed performance plots and generation timestamps.
--   **Bear Market Alert**: Visual warning and "LIQUIDATE" recommendation when **Benchmark (510300.SH) Close < 60-Day Moving Average**.
 
 ## Live Trading & Data Periods
 
@@ -199,7 +198,6 @@ The live trading engine receives constant updates to ensure the highest fidelity
 
 - **Phase 1 Validation**: Calculates honest "Out-of-Sample" Rank IC and Sharpe metrics by holding out the last **60 days** from training. This prevents overconfidence from "in-sample" validation.
 - **Phase 2 Production**: Retrains the model on *all* available history to generate the optimal signal for tomorrow.
-- **Regime Filter**: The system checks the Benchmark (510300.SH). If **Price < MA60**, it triggers a **Bear Market Warning** and recommends holding **CASH** (Liquidate All).
 
 ### 2. Data Period Breakdown
 Understanding the data split is crucial for replicating results:
