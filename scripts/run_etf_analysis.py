@@ -39,6 +39,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--end_time", type=str, default=None, help="Backtest End Time (e.g. 2025-12-31)")
     parser.add_argument("--experiment_name", type=str, default=None, help="Custom MLflow Experiment Name")
     
+    # Walk-Forward Validation
+    parser.add_argument("--walk_forward", action="store_true", help="Use walk-forward validation (matches live trading behavior)")
+    parser.add_argument("--train_window_months", type=int, default=24, help="Training window in months for walk-forward (default: 24)")
+    parser.add_argument("--retrain_frequency_months", type=int, default=1, help="Retrain frequency in months for walk-forward (default: 1)")
+    
     return parser.parse_args()
 
 # fix_seed is now imported from delorean.utils
@@ -65,6 +70,66 @@ def main() -> None:
         p_path = os.path.join("artifacts", p)
         if os.path.exists(p_path):
             os.remove(p_path)
+
+    # === WALK-FORWARD VALIDATION MODE ===
+    if args.walk_forward:
+        from delorean.walk_forward import WalkForwardValidator, WalkForwardConfig
+        from qlib.contrib.evaluate import risk_analysis
+        
+        print("\n" + "="*60)
+        print("  WALK-FORWARD VALIDATION MODE")
+        print("="*60)
+        
+        test_start = args.test_start_time if args.test_start_time else TEST_START_TIME
+        test_end = args.end_time if args.end_time else END_TIME
+        
+        config = WalkForwardConfig(
+            train_window_months=args.train_window_months,
+            retrain_frequency_months=args.retrain_frequency_months,
+            smooth_window=args.smooth_window,
+            label_horizon=args.label_horizon,
+            seed=args.seed
+        )
+        
+        # Run walk-forward validation
+        validator = WalkForwardValidator(config=config)
+        pred = validator.run(test_start, test_end)
+        
+        # Run backtest with walk-forward predictions
+        backtest_engine = BacktestEngine(pred)
+        report, positions = backtest_engine.run(
+            topk=args.topk,
+            n_drop=1,
+            buffer=args.buffer,
+            start_time=test_start,
+            end_time=None
+        )
+        
+        # Log to MLflow (end any active runs first)
+        import mlflow
+        if mlflow.active_run():
+            mlflow.end_run()
+            
+        with R.start(experiment_name=DEFAULT_EXPERIMENT_NAME) as recorder:
+            params = {k: str(v) for k, v in vars(args).items()}
+            params["mode"] = "walk_forward"
+            R.log_params(**params)
+            
+            if isinstance(report, pd.DataFrame) and 'return' in report.columns:
+                risk_df = risk_analysis(report['return'])
+                sharpe = risk_df.loc['information_ratio', 'risk'] if 'information_ratio' in risk_df.index else None
+                if sharpe is not None:
+                    R.log_metrics(sharpe=float(sharpe))
+                    print(f"\n[Walk-Forward] Sharpe Ratio: {sharpe:.4f}")
+        
+        # Analysis and save
+        analyzer = ResultAnalyzer()
+        analyzer.process(report, positions)
+        
+        print("\n" + "="*60)
+        print("  Walk-Forward Validation Complete")
+        print("="*60)
+        return  # Exit early, skip standard mode
 
 
     # 2. Data Loading
@@ -169,7 +234,6 @@ def main() -> None:
         # Strategy Parameters
         strategy_params = {
             "topk": args.topk,
-            "drop_rate": 0.96,
             "n_drop": 1,
             "buffer": args.buffer,
             "risk_parity": args.risk_parity,
@@ -196,7 +260,6 @@ def main() -> None:
         # Run Backtest
         report, positions = backtest_engine.run(
             topk=strategy_params["topk"], 
-            drop_rate=strategy_params["drop_rate"], 
             n_drop=strategy_params["n_drop"], 
             buffer=strategy_params["buffer"],
             vol_feature=vol_feature,

@@ -15,19 +15,16 @@ logger = logging.getLogger(__name__)
 
 class SimpleTopkStrategy(BaseSignalStrategy):
     """
-    Robust TopK strategy with probabilistic retention to drastically reduce turnover.
+    Robust TopK strategy with deterministic turnover control using buffer and n_drop.
     
     Attributes:
         topk (int): Number of stocks to hold.
         risk_degree (float): Percentage of capital to invest.
-        drop_rate (float): Probability of **keeping** existing positions (skipping trading). 
-                           User terminology: "dropout_rate" ~96% -> 96% chance keep old.
         n_drop (int): Maximum number of stocks to swap per trading step if trading occurs.
     """
-    def __init__(self, topk: int = 4, risk_degree: float = 0.95, drop_rate: float = 0.96, n_drop: int = 1, buffer: int = 2, vol_feature: pd.Series = None, trend_feature: pd.Series = None, **kwargs: Any):
+    def __init__(self, topk: int = 4, risk_degree: float = 0.95, n_drop: int = 1, buffer: int = 2, vol_feature: pd.Series = None, trend_feature: pd.Series = None, **kwargs: Any):
         super().__init__(risk_degree=risk_degree, **kwargs)
         self.topk = topk
-        self.drop_rate = drop_rate
         self.n_drop = n_drop
         self.buffer = buffer
         self.vol_feature = vol_feature 
@@ -45,13 +42,9 @@ class SimpleTopkStrategy(BaseSignalStrategy):
         trade_step = self.trade_calendar.get_trade_step()
         trade_start_time, trade_end_time = self.trade_calendar.get_step_time(trade_step)
         
-        # Turnover control: Probabilistic Retention (Pre-check)
-        current_risk_degree = self.risk_degree 
-        current_holdings_list = self.trade_position.get_stock_list()
-        should_force_trade = (len(current_holdings_list) == 0) and (current_risk_degree > 0)
-        
-        if (not should_force_trade) and (random.random() < self.drop_rate):
-            return TradeDecisionWO([], self)
+        # 2. Get Scores 
+        # (Drop logic removed as unnecessary)
+
         
         # 2. Get Scores
         pred_score = self._get_pred_scores(trade_step)

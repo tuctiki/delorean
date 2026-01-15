@@ -99,6 +99,29 @@ python scripts/run_etf_analysis.py \
 -   `--start_time / --end_time`: Data range overrides.
 -   `--train_end_time / --test_start_time`: Split configuration.
 -   `--experiment_name <str>`: *(Deprecated)* All runs now log to default experiment `ETF_Strategy`.
+-   `--walk_forward`: Enable walk-forward validation (realistic, matches live).
+-   `--train_window_months <int>`: Training window for walk-forward (default: 24).
+-   `--retrain_frequency_months <int>`: Retrain frequency (default: 1 = monthly).
+
+### Walk-Forward Validation (Recommended for Final Testing)
+
+Walk-forward validation retrains the model monthly, matching live trading behavior:
+
+```bash
+# Quick iteration (standard backtest) - ~10s
+python scripts/run_etf_analysis.py --topk 4
+
+# Final validation (walk-forward) - ~2min
+python scripts/run_etf_analysis.py --topk 4 --walk_forward
+```
+
+| Mode | Sharpe | Description |
+|------|--------|-------------|
+| Standard | 0.67 | Optimistic, good for quick iteration |
+| Walk-Forward | 0.45 | Realistic, matches live performance |
+
+> [!TIP]
+> Use **standard mode** for development and quick experiments. Use **`--walk_forward`** before deploying changes to production.
 
 ### 4. MLflow UI (Experiment Management)
 
