@@ -82,8 +82,8 @@ To run research experiments (e.g., Stress Test 2015-2025):
 ```bash
 export PYTHONPATH=$PYTHONPATH:.
 python scripts/run_etf_analysis.py \
-  --topk 5 --dynamic_exposure --seed 42 \
-  --smooth_window 20 --buffer 2 --label_horizon 5 \
+  --topk 4 --seed 42 \
+  --smooth_window 10 --buffer 2 --label_horizon 1 \
   --start_time 2015-01-01 \
   --end_time 2025-12-31 \
   --train_end_time 2021-12-31 \
@@ -91,8 +91,9 @@ python scripts/run_etf_analysis.py \
 ```
 
 **Options:**
--   `--label_horizon <int>`: Forecast horizon in days (default: 5).
--   `--smooth_window <int>`: EWMA smoothing for signals (default: 15).
+-   `--label_horizon <int>`: Forecast horizon in days (default: 1).
+-   `--smooth_window <int>`: EWMA smoothing for signals (default: 10).
+-   `--topk <int>`: Number of top ETFs to hold (default: 4).
 -   `--dynamic_exposure`: Enable Trend-based Dynamic Exposure (Manage Beta).
 -   `--risk_parity`: Enable Volatility Targeting (Optional, 1/Vol weighting).
 -   `--start_time / --end_time`: Data range overrides.
@@ -111,24 +112,21 @@ Access at `http://localhost:5000`.
 ## Implementation Details
 
 ### Factor Models
-The strategy utilizes a **Custom Hybrid Factor Model** composed of **8 optimized factors** for the Chinese ETF market:
+The strategy utilizes a **Custom Factor Model** composed of **7 optimized factors** for the Chinese ETF market:
 
 > [!NOTE]
-> **2026-01-14 Optimization**: Reduced from 11 to 8 factors based on comprehensive audit. Removed 3 factors: ROC_Rev (no signal), KC_Width_Norm (redundant), and VolAdj_Mom_10 (0.98 correlation with Mom_Vol_Combo).
+> **2026-01-15 Optimization**: Reduced from 8 to 7 factors. Removed VOL60 (negative IC), Mom20_VolAdj and Accel_Rev (high correlation with new factors). Added Mom_Persistence and Acceleration from Round 4 alpha mining.
 
-
-
-#### Core Factors (6)
+#### Core Factors (3)
 1.  **MarketCap_Liquidity**: `Log(Mean($volume * $close, 20))` - Liquidity and market cap proxy.
 2.  **MOM60**: `$close / Ref($close, 60) - 1` - Medium-term Momentum.
 3.  **MOM120**: `$close / Ref($close, 120) - 1` - Long-term Momentum.
-4.  **VOL60**: `Std($close / Ref($close, 1) - 1, 60)` - Medium-term Volatility.
-5.  **Mom20_VolAdj**: `($close / Ref($close, 20) - 1) / Std($close, 20)` - Volatility-Adjusted Momentum (20-day).
-6.  **Accel_Rev**: `-1 * ($close - 2*Ref($close, 5) + Ref($close, 10))` - Reversal on Acceleration.
 
-#### Validated Factors from Alpha Mining (2)
-7. **Mom_Vol_Combo**: `($close / Ref($close, 10) - 1) * (1 / (Std($close / Ref($close, 1) - 1, 20) + 0.001))` - Momentum-Volatility Composite (Test IC: 0.037, Alpha: 12.9%).
-8. **Gap_Fill**: `($close - $open) / (Abs($open - Ref($close, 1)) + 0.001)` - Gap Filling Tendency (Test IC: 0.032, highly unique).
+#### Validated Factors from Alpha Mining (4)
+4. **Trend_Efficiency**: `($close / Ref($close, 20) - 1) / (Std(...) + 0.0001)` - Risk-adjusted trend strength (IC: 0.034).
+5. **Gap_Fill**: `($close - $open) / (Abs($open - Ref($close, 1)) + 0.001)` - Gap filling tendency (IC: 0.032).
+6. **Mom_Persistence**: `Sum(If($close > Ref($close, 1), 1, 0), 10) / 10` - Momentum consistency (IC: 0.059).
+7. **Acceleration**: `($close / Ref($close, 5) - 1) - (Ref($close, 5) / Ref($close, 10) - 1)` - Price acceleration (IC: 0.053).
 
 ### ETF Universe (14 Assets)
 - **Broad Market**: CSI 300 (510300.SH), A500 (563360.SH), ChiNext (159915.SZ), STAR 50 (588000.SH), CSI 1000 (512100.SH)
@@ -137,7 +135,7 @@ The strategy utilizes a **Custom Hybrid Factor Model** composed of **8 optimized
 
 **Optimization Technique**:
 -   **Preprocessing**: Cross-Sectional Z-Score Feature Neutralization.
--   **Labeling**: **5-Day Forward Return** (`Ref($close, -5) / $close - 1`).
+-   **Labeling**: **1-Day Forward Return** (`Ref($close, -1) / $close - 1`).
 -   **Modeling**: LightGBM Regressor.
 
 ### Model Hyperparameters (Stage 1)
@@ -146,31 +144,34 @@ The strategy utilizes a **Custom Hybrid Factor Model** composed of **8 optimized
 - **Max Depth**: 5
 - **Feature Fraction (Colsample)**: 0.61
 - **Bagging Fraction (Subsample)**: 0.6
-- **Regularization**: L1=7.5, L2=2.5
+- **Regularization**: L1=0.1, L2=0.1
 
 ### Position Control
-The strategy now supports advanced position sizing:
--   **Equal Weight (Default)**: Allocates capital equally among Top 5 holdings.
--   **Dynamic Market Exposure**: Adjusts equity exposure (0% - 99%) based on the Benchmark Trend Strength (Close vs MA60) with **Hysteresis** to prevent whipsaws.
+The strategy uses simple, robust position sizing:
+-   **Equal Weight (Default)**: Allocates capital equally among Top 4 holdings.
+-   **TopK**: 4 (optimized from 5 for higher concentration).
+-   **Smooth Window**: 10-day EWMA for signal smoothing.
 
 ### Experiment Tracking
 All backtest runs are logged to the default experiment `ETF_Strategy` in `mlruns/`.
 -   **Dashboard**: View Run History at `http://localhost:3000/experiments`.
 -   **MLflow UI**: For advanced comparison and artifact browsing, run `mlflow ui --port 5000`.
 
-### Performance (Latest: 2026-01-14)
+### Performance (Latest: 2026-01-15)
 
-**Current Performance (Optimized 8-Factor Library)**:
+**Current Performance (Optimized 7-Factor Library)**:
 
 | Metric | Result (Test 2023-2025) |
 | :--- | :--- |
-| **Sharpe Ratio** | **0.894** |
-| **Rank IC** | **0.047** |
-| **Factor Count** | **8** (optimized from 11) |
-| **Test Period** | 2023-01-01 to 2025-12-31 |
+| **Sharpe Ratio** | **1.05** |
+| **Annual Return** | **20.4%** |
+| **Max Drawdown** | **-24.0%** |
+| **Factor Count** | **7** (optimized) |
+| **TopK** | **4** |
+| **Label Horizon** | **1 Day** |
 
 > [!NOTE]
-> **2026-01-14 Update**: Factor library optimized through comprehensive audit. Removed 3 weak/redundant factors, resulting in 17% Sharpe improvement (0.764 → 0.894) and 266% Rank IC improvement (0.013 → 0.047).
+> **2026-01-15 Update**: Strategy configuration optimized (TopK 5→4, Horizon 5→1, Smooth 15→10). Regime filter removed for simplified always-invested strategy. Sharpe improved from 0.26 to 1.05.
 
 **Historical Performance (Stress Test: 2022-Present)**:
 
