@@ -30,25 +30,31 @@ class ResultAnalyzer:
         pd.to_pickle(analysis, os.path.join(OUTPUT_DIR, "backtest_analysis.pkl"))
         print(f"\nBacktest results saved to pkl files in {OUTPUT_DIR}.")
 
-        # Turnover
-        # Use the pre-calculated turnover rate from Qlib
+        # Turnover Analysis
         turnover_rate = report["turnover"]
-        avg_turnover = turnover_rate.mean() * 252 # Annualized
-        print(f"\nAnnualized Turnover (Avg): {avg_turnover:.2%}")
+        avg_daily_turnover = turnover_rate.mean()
+        ann_turnover = avg_daily_turnover * 252  # Annualized
+        trading_days = (turnover_rate > 0).sum()
+        total_days = len(turnover_rate)
         
-        # Debug print to verify
-        print("Tail of report columns (turnover check):")
-        print(report[["total_turnover", "turnover"]].tail())
+        print(f"\n--- Turnover Statistics ---")
+        print(f"Daily Mean Turnover:   {avg_daily_turnover:.2%}")
+        print(f"Annualized Turnover:   {ann_turnover:.2%}")
+        print(f"Trading Days:          {trading_days} / {total_days} ({trading_days/total_days*100:.1f}%)")
 
-        self.analyze_results(report, analysis)
+        self.analyze_results(report, analysis, avg_daily_turnover, trading_days, total_days)
 
-    def analyze_results(self, report: pd.DataFrame, risk_metrics: pd.DataFrame) -> None:
+    def analyze_results(self, report: pd.DataFrame, risk_metrics: pd.DataFrame, 
+                        avg_daily_turnover: float = 0.0, trading_days: int = 0, total_days: int = 0) -> None:
         """
         Print formatted metrics and generate plots.
 
         Args:
             report (pd.DataFrame): Backtest report.
             risk_metrics (pd.DataFrame): Risk analysis DataFrame from qlib.
+            avg_daily_turnover (float): Average daily turnover rate.
+            trading_days (int): Number of days with trading activity.
+            total_days (int): Total number of trading days.
         """
         print("\n=== Detailed Backtest Analysis ===")
         
@@ -109,6 +115,11 @@ class ResultAnalyzer:
                 "max_drawdown": sanitize(float(max_dd)),
                 "sharpe_ratio": sanitize(float(sharpe)),
                 "win_rate": sanitize(float(win_rate)),
+                "daily_turnover": sanitize(float(avg_daily_turnover)),
+                "annualized_turnover": sanitize(float(avg_daily_turnover * 252)),
+                "trading_days": int(trading_days),
+                "total_days": int(total_days),
+                "trading_frequency": sanitize(float(trading_days / total_days)) if total_days > 0 else 0.0,
                 "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             }
             
