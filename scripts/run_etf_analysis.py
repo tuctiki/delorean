@@ -118,14 +118,64 @@ def main() -> None:
             
             if isinstance(report, pd.DataFrame) and 'return' in report.columns:
                 risk_df = risk_analysis(report['return'])
-                sharpe = risk_df.loc['information_ratio', 'risk'] if 'information_ratio' in risk_df.index else None
+                sharpe = risk_df.loc['sharpe', 'risk'] if 'sharpe' in risk_df.index else None
+                if sharpe is None:
+                     sharpe = risk_df.loc['information_ratio', 'risk'] if 'information_ratio' in risk_df.index else None
+                
+                # Calculate Rank IC for walk-forward predictions
+                try:
+                    from delorean.utils import calculate_rank_ic
+                    from delorean.data import ETFDataLoader
+                    
+                    # Load labels for the entire test period to calculate IC
+                    loader = ETFDataLoader(label_horizon=args.label_horizon)
+                    # We only need the test segment's labels
+                    dataset = loader.load_data(test_start=test_start, test_end=test_end)
+                    labels = dataset.prepare("test", col_set="label", data_key="infer")
+                    rank_ic = calculate_rank_ic(pred, labels)
+                except Exception as e:
+                    print(f"Warning: Could not calculate Rank IC: {e}")
+                    rank_ic = None
+
                 if sharpe is not None:
                     R.log_metrics(sharpe=float(sharpe))
                     print(f"\n[Walk-Forward] Sharpe Ratio: {sharpe:.4f}")
+                if rank_ic is not None:
+                    R.log_metrics(rank_ic=float(rank_ic))
+                    print(f"[Walk-Forward] Rank IC: {rank_ic:.4f}")
+
+                # Log turnover metrics
+                if 'turnover' in report.columns:
+                    avg_turnover = report['turnover'].mean()
+                    ann_turnover = avg_turnover * 252
+                    trading_days = int((report['turnover'] > 0).sum())
+                    R.log_metrics(
+                        daily_turnover=float(avg_turnover),
+                        ann_turnover=float(ann_turnover),
+                        trading_days=float(trading_days)
+                    )
+                    print(f"[Walk-Forward] Annualized Turnover: {ann_turnover:.2%}")
         
-        # Analysis and save
-        analyzer = ResultAnalyzer()
-        analyzer.process(report, positions)
+            # Run Factor Analysis on the test period data to generate IC plots
+            try:
+                # We reuse the dataset loader to get a combined dataset for the test period
+                loader_fa = ETFDataLoader(label_horizon=args.label_horizon)
+                dataset_fa = loader_fa.load_data(test_start=test_start, test_end=test_end)
+                factor_analyzer = FactorAnalyzer()
+                factor_analyzer.analyze(dataset_fa)
+            except Exception as e:
+                print(f"Warning: Factor Analysis failed in walk-forward mode: {e}")
+
+            # Analysis and save (Cumulative return plots)
+            analyzer = ResultAnalyzer()
+            analyzer.process(report, positions)
+
+            # Log Plots as Artifacts
+            plots = ["cumulative_return.png", "excess_return.png", "factor_ic.png", "feature_correlation.png"]
+            for p in plots:
+                 p_path = os.path.join("artifacts", p)
+                 if os.path.exists(p_path):
+                     R.log_artifact(p_path)
         
         print("\n" + "="*60)
         print("  Walk-Forward Validation Complete")
