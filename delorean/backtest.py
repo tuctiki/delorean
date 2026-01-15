@@ -22,13 +22,15 @@ class SimpleTopkStrategy(BaseSignalStrategy):
         risk_degree (float): Percentage of capital to invest.
         n_drop (int): Maximum number of stocks to swap per trading step if trading occurs.
     """
-    def __init__(self, topk: int = 4, risk_degree: float = 0.95, n_drop: int = 1, buffer: int = 2, vol_feature: pd.Series = None, trend_feature: pd.Series = None, **kwargs: Any):
+    def __init__(self, topk: int = 4, risk_degree: float = 0.95, n_drop: int = 1, buffer: int = 2, 
+                 vol_feature: pd.Series = None, trend_feature: pd.Series = None, target_vol: float = None, **kwargs: Any):
         super().__init__(risk_degree=risk_degree, **kwargs)
         self.topk = topk
         self.n_drop = n_drop
         self.buffer = buffer
         self.vol_feature = vol_feature 
         self.trend_feature = trend_feature 
+        self.target_vol = target_vol 
         
         # Initialize Sub-Models
         self.optimizer = PortfolioOptimizer(topk=topk, risk_degree=risk_degree)
@@ -76,7 +78,8 @@ class SimpleTopkStrategy(BaseSignalStrategy):
         target_weights = self.optimizer.calculate_weights(
             target_stocks, 
             trade_start_time, 
-            vol_feature=self.vol_feature
+            vol_feature=self.vol_feature,
+            target_vol=self.target_vol
         )
         
         # 5. Execution (Generate Orders)
@@ -128,7 +131,9 @@ class BacktestEngine:
             topk (int): Number of stocks to hold in the TopK strategy.
             start_time (str|pd.Timestamp): Custom start time for backtest. Defaults to config.TEST_START_TIME.
             end_time (str|pd.Timestamp): Custom end time for backtest. Defaults to derived from data.
+            end_time (str|pd.Timestamp): Custom end time for backtest. Defaults to derived from data.
             use_trend_filter (bool): Whether to enable the per-asset trend filter (Default: False).
+            target_vol (float): Annualized Target Volatility (e.g. 0.20 for 20%). None = No targeting.
             **kwargs: Additional strategy parameters (drop_rate, n_drop).
 
         Returns:
@@ -174,6 +179,7 @@ class BacktestEngine:
             "risk_degree": 0.95,
             "signal": self.pred,
             "trend_feature": trend_feature,
+            "target_vol": kwargs.get('target_vol', None),
             **kwargs # Pass drop_rate and n_drop
         }
 

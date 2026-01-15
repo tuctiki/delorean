@@ -19,29 +19,25 @@ class ETFDataHandler(DataHandlerLP):
         Optimized 7-factor library after 2026-01-14 audit.
         """
         custom_exprs = [
-            "Log(Mean($volume * $close, 20))",                  # MarketCap_Liquidity
             "$close / Ref($close, 60) - 1",                     # MOM60
             "$close / Ref($close, 120) - 1",                    # MOM120
-            # Removed VOL60 (2026-01-14 Audit: Negative IC=-0.063)
-            # Removed Mom20_VolAdj (2026-01-14 Audit: 0.79 corr with Trend_Efficiency)
-            # Removed Accel_Rev (2026-01-14 Audit: 0.85 corr with Acceleration)
             # === VALIDATED FACTORS ===
             "($close / Ref($close, 20) - 1) / (Std($close / Ref($close, 1) - 1, 20) + 0.0001)", # Trend_Efficiency (IC=0.034)
-            "($close - $open) / (Abs($open - Ref($close, 1)) + 0.001)",  # Gap_Fill (IC=0.032)
-            # === ROUND 4 FACTORS (Alpha Mining 2026-01-14) ===
+            "($close - $open) / (Abs($open - Ref($close, 1)) + 0.001)",  # Gap_Fill (Structural)
+            # === ROUND 5 FACTORS (Alpha Mining 2026-01-15) ===
             "Sum(If($close > Ref($close, 1), 1, 0), 10) / 10",  # Mom_Persistence (IC=0.059)
             "($close / Ref($close, 5) - 1) - (Ref($close, 5) / Ref($close, 10) - 1)",  # Acceleration (IC=0.053)
+            "-1 * Corr($close / Ref($close, 1), $volume / Ref($volume, 1), 10)",  # Vol_Price_Div (IC=-0.037 -> 0.037)
         ]
         
         custom_names = [
-             "MarketCap_Liquidity",
              "MOM60",
              "MOM120",
-             # Removed: VOL60, Mom20_VolAdj, Accel_Rev (2026-01-14 Audit)
              "Trend_Efficiency",
              "Gap_Fill",
              "Mom_Persistence",
              "Acceleration",
+             "Vol_Price_Div",
         ]
         return custom_exprs, custom_names
 

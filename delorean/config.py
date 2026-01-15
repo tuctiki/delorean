@@ -2,11 +2,26 @@ from qlib.config import REG_CN
 
 # ETF List
 ETF_LIST = [
+    # Broad Market (China)
     "510300.SH",    # 沪深300ETF
     "563360.SH",    # 华泰柏瑞中证A500ETF
     "159915.SZ",    # 新增：创业板ETF (ChiNext)
     "588000.SH",    # 新增：科创50ETF (STAR 50)
     "512100.SH",    # 新增：中证1000ETF (Small Cap)
+    "510050.SH",    # 新增：上证50 (Large Cap Value)
+    "510900.SH",    # 新增：H股ETF (H-Share)
+    
+    # Global / QDII
+    "513050.SH",    # 新增：中概互联 (KWEB)
+    "513100.SH",    # 新增：纳指100 (Nasdaq 100)
+    "513500.SH",    # 新增：标普500 (S&P 500)
+    "159920.SZ",    # 新增：恒生ETF (HSI)
+    
+    # Commodities
+    "518880.SH",    # 新增：黄金ETF (Gold)
+    "512400.SH",    # 新增：有色金属 (Commodity Proxy)
+    
+    # Sector
     "512480.SH",    # 半导体
     "516160.SH",    # 新能源车
     "512690.SH",    # 白酒
@@ -15,15 +30,31 @@ ETF_LIST = [
     "510630.SH",    # 消费
     "515790.SH",    # 光伏
     "512880.SH",    # 证券
+    "512660.SH",    # 新增：军工 (Defense)
     "510880.SH",    # 红利ETF (Defensive)
 ]
 
 ETF_NAME_MAP = {
+    # Broad Market (China)
     "510300.SH": "CSI 300",
     "563360.SH": "A500",
     "159915.SZ": "ChiNext (Startup)",
     "588000.SH": "STAR 50 (Tech)",
     "512100.SH": "CSI 1000 (Small Cap)",
+    "510050.SH": "SSE 50 (Large Cap)",
+    "510900.SH": "H-Share (HSCEI)",
+    
+    # Global / QDII
+    "513050.SH": "KWEB (China Internet)",
+    "513100.SH": "Nasdaq 100",
+    "513500.SH": "S&P 500",
+    "159920.SZ": "Hang Seng Index",
+    
+    # Commodities
+    "518880.SH": "Gold",
+    "512400.SH": "Non-Ferrous (Resources)",
+    
+    # Sector
     "512480.SH": "Semiconductor",
     "516160.SH": "New Energy",
     "512690.SH": "Spirit/Liquor",
@@ -32,6 +63,7 @@ ETF_NAME_MAP = {
     "510630.SH": "Consumer",
     "515790.SH": "PV/Solar",
     "512880.SH": "Securities",
+    "512660.SH": "Defense/Military",
     "510880.SH": "Dividend (RedChip)",
 }
 
@@ -59,7 +91,10 @@ DEFAULT_BACKTEST_PARAMS = {
     "topk": 4,
     "label_horizon": 1,
     "smooth_window": 10,
+    "target_vol": 0.20, # Added default target vol
 }
+
+DEFAULT_TARGET_VOLATILITY = 0.20
 
 # Live Trading Configuration (used by run_live_trading.py)
 LIVE_TRADING_CONFIG = {

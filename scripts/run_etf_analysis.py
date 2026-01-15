@@ -23,6 +23,7 @@ def parse_args() -> argparse.Namespace:
     """
     parser = argparse.ArgumentParser(description="Run ETF Strategy Analysis")
     parser.add_argument("--topk", type=int, default=4, help="Number of stocks to hold in TopK strategy (default: 4)")
+    parser.add_argument("--target_vol", type=float, default=None, help="Annualized Target Volatility (e.g. 0.20). Default: None (Full Exposure)")
     parser.add_argument("--use_alpha158", action="store_true", help="Use Qlib Alpha158 embedded factors")
     parser.add_argument("--use_hybrid", action="store_true", help="Use Hybrid Factors (Custom + Alpha158)")
     parser.add_argument("--risk_parity", action="store_true", help="Enable Volatility Targeting (1/Vol)")
@@ -237,14 +238,16 @@ def main() -> None:
             "n_drop": 1,
             "buffer": args.buffer,
             "risk_parity": args.risk_parity,
-            "dynamic_exposure": args.dynamic_exposure
+            "dynamic_exposure": args.dynamic_exposure,
+            "target_vol": args.target_vol
         }
         
         # Prepare Position Control Data
         vol_feature = None
-        if args.risk_parity:
+        # We need vol feature if risk_parity OR target_vol is enabled
+        if args.risk_parity or args.target_vol:
             # We need VOL20. 
-            print("Fetching Volatility Data for Risk Parity...")
+            print("Fetching Volatility Data for Risk Parity / Target Vol...")
             # Fetch explicitly via Qlib
             try:
                 from qlib.data import D
@@ -263,6 +266,7 @@ def main() -> None:
             n_drop=strategy_params["n_drop"], 
             buffer=strategy_params["buffer"],
             vol_feature=vol_feature,
+            target_vol=strategy_params["target_vol"],
             start_time=test_start,
             end_time=None # Let Engine determine safe end date from sliced pred
         )
