@@ -16,7 +16,7 @@ class ETFDataHandler(DataHandlerLP):
     def get_custom_factors():
         """
     Returns a tuple of (expressions, names) for the custom ETF factors.
-    Optimized 6-factor library (tested consolidation, kept separate MOM factors).
+    7-factor library (added RSI_Divergence defensive factor).
     """
         custom_exprs = [
             "$close / Ref($close, 60) - 1",                     # MOM60
@@ -27,6 +27,8 @@ class ETFDataHandler(DataHandlerLP):
             "Sum(If($close > Ref($close, 1), 1, 0), 10) / 10",  # Mom_Persistence (IC=0.059)
             "($close / Ref($close, 5) - 1) - (Ref($close, 5) / Ref($close, 10) - 1)",  # Acceleration (IC=0.053)
             "-1 * Corr($close / Ref($close, 1), $volume / Ref($volume, 1), 10)",  # Vol_Price_Div (IC=-0.037 -> 0.037)
+            # === DEFENSIVE FACTOR (2026-01-15) ===
+            "Corr($close / Ref($close, 1) - 1, (Mean(If($close > Ref($close, 1), $close - Ref($close, 1), 0), 14) / (Mean(Abs($close - Ref($close, 1)), 14) + 0.0001)), 10)",  # RSI_Divergence (IC=-0.0305)
         ]
         
         custom_names = [
@@ -36,6 +38,7 @@ class ETFDataHandler(DataHandlerLP):
              "Mom_Persistence",
              "Acceleration",
              "Vol_Price_Div",
+             "RSI_Divergence",
         ]
         return custom_exprs, custom_names
 
