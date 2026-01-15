@@ -140,16 +140,16 @@ The strategy utilizes a **Custom Factor Model** composed of **7 optimized factor
 > [!NOTE]
 > **2026-01-15 Optimization**: Reduced from 8 to 7 factors. Removed VOL60 (negative IC), Mom20_VolAdj and Accel_Rev (high correlation with new factors). Added Mom_Persistence and Acceleration from Round 4 alpha mining.
 
-#### Core Factors (3)
-1.  **MarketCap_Liquidity**: `Log(Mean($volume * $close, 20))` - Liquidity and market cap proxy.
-2.  **MOM60**: `$close / Ref($close, 60) - 1` - Medium-term Momentum.
-3.  **MOM120**: `$close / Ref($close, 120) - 1` - Long-term Momentum.
+#### Core Factors (2)
+1.  **MOM60**: `$close / Ref($close, 60) - 1` - Medium-term Momentum.
+2.  **MOM120**: `$close / Ref($close, 120) - 1` - Long-term Momentum.
 
-#### Validated Factors from Alpha Mining (4)
-4. **Trend_Efficiency**: `($close / Ref($close, 20) - 1) / (Std(...) + 0.0001)` - Risk-adjusted trend strength (IC: 0.034).
-5. **Gap_Fill**: `($close - $open) / (Abs($open - Ref($close, 1)) + 0.001)` - Gap filling tendency (IC: 0.032).
-6. **Mom_Persistence**: `Sum(If($close > Ref($close, 1), 1, 0), 10) / 10` - Momentum consistency (IC: 0.059).
-7. **Acceleration**: `($close / Ref($close, 5) - 1) - (Ref($close, 5) / Ref($close, 10) - 1)` - Price acceleration (IC: 0.053).
+#### Validated Factors (5)
+3. **Trend_Efficiency**: `($close / Ref($close, 20) - 1) / (Std(...) + 0.0001)` - Risk-adjusted trend strength.
+4. **Gap_Fill**: `($close - $open) / (Abs($open - Ref($close, 1)) + 0.001)` - Gap filling tendency.
+5. **Mom_Persistence**: `Sum(If($close > Ref($close, 1), 1, 0), 10) / 10` - Momentum consistency.
+6. **Acceleration**: `($close / Ref($close, 5) - 1) - (Ref($close, 5) / Ref($close, 10) - 1)` - Price acceleration.
+7. **Vol_Price_Div**: `-1 * Corr($close / Ref($close, 1), $volume / Ref($volume, 1), 10)` - Price-Volume Divergence (New).
 
 ### ETF Universe (14 Assets)
 - **Broad Market**: CSI 300 (510300.SH), A500 (563360.SH), ChiNext (159915.SZ), STAR 50 (588000.SH), CSI 1000 (512100.SH)
@@ -186,10 +186,10 @@ All backtest runs are logged to the default experiment `ETF_Strategy` in `mlruns
 
 | Metric | Result (Test 2023-2025) |
 | :--- | :--- |
-| **Sharpe Ratio** | **1.05** |
-| **Annual Return** | **20.4%** |
-| **Max Drawdown** | **-24.0%** |
-| **Factor Count** | **7** (optimized) |
+| **Sharpe Ratio** | **0.45** |
+| **Annual Return** | **~11.2%** |
+| **Max Drawdown** | **-32.4%** |
+| **Factor Count** | **7** |
 | **TopK** | **4** |
 | **Label Horizon** | **1 Day** |
 
@@ -328,3 +328,14 @@ The backend container also runs a cron job for daily trading tasks at 18:00 on w
 - Created comprehensive audit and optimization reports
 
 **Final State**: Optimized 8-factor library with Sharpe Ratio of 0.894, ready for production.
+### 2026-01-15: Factor Tuning & Optimization Revert
+
+#### Optimization Attempt
+- Attempted to tune lookback windows (to 60d/160d).
+- **Result**: Improved IC on recent data but failed 2022 stress test (Sharpe -0.11).
+- **Decision**: Reverted windows to robust medium-term defaults.
+
+#### Final Configuration
+- **Added**: `Vol_Price_Div` (10d).
+- **Removed**: `MarketCap_Liquidity` (Low signal).
+- **Status**: Stable 7-factor library.
