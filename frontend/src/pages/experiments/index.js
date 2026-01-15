@@ -144,6 +144,7 @@ export default function Experiments() {
                                     <th style={{ padding: '12px 8px' }}>Name</th>
                                     <th style={{ padding: '12px 8px', textAlign: 'right' }}>Sharpe</th>
                                     <th style={{ padding: '12px 8px', textAlign: 'right' }}>Rank IC</th>
+                                    <th style={{ padding: '12px 8px', textAlign: 'right' }}>Turnover</th>
                                     <th style={{ padding: '12px 8px' }}>Created</th>
                                     <th style={{ padding: '12px 8px', textAlign: 'right' }}>Actions</th>
                                 </tr>
@@ -158,6 +159,9 @@ export default function Experiments() {
                                         </td>
                                         <td style={{ padding: '12px 8px', textAlign: 'right', fontFamily: 'monospace', color: (exp.metrics?.rank_ic || 0) > 0.02 ? '#2ecc71' : '#f1c40f' }}>
                                             {typeof exp.metrics?.rank_ic === 'number' ? exp.metrics.rank_ic.toFixed(4) : '-'}
+                                        </td>
+                                        <td style={{ padding: '12px 8px', textAlign: 'right', fontFamily: 'monospace', color: '#f1c40f' }}>
+                                            {typeof exp.metrics?.ann_turnover === 'number' ? `${(exp.metrics.ann_turnover * 100).toFixed(0)}%` : '-'}
                                         </td>
                                         <td style={{ padding: '12px 8px', color: '#8b949e', fontSize: '0.85rem' }}>
                                             {exp.timestamp ? new Date(exp.timestamp * 1000).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false }) : '-'}

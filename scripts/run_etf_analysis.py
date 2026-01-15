@@ -226,7 +226,20 @@ def main() -> None:
                     R.log_metrics(sharpe=float(sharpe))
                 if rank_ic is not None:
                     R.log_metrics(rank_ic=float(rank_ic))
-                print(f"Logged metrics to MLflow: sharpe={sharpe}, rank_ic={rank_ic}")
+                
+                # Log turnover metrics
+                if 'turnover' in report.columns:
+                    avg_turnover = report['turnover'].mean()
+                    ann_turnover = avg_turnover * 252
+                    trading_days = int((report['turnover'] > 0).sum())
+                    R.log_metrics(
+                        daily_turnover=float(avg_turnover),
+                        ann_turnover=float(ann_turnover),
+                        trading_days=float(trading_days)
+                    )
+                    print(f"Logged metrics to MLflow: sharpe={sharpe}, rank_ic={rank_ic}, ann_turnover={ann_turnover:.2%}")
+                else:
+                    print(f"Logged metrics to MLflow: sharpe={sharpe}, rank_ic={rank_ic}")
             else:
                 print("Warning: Report format invalid for metric logging")
         except Exception as e:
