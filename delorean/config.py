@@ -104,6 +104,7 @@ LIVE_TRADING_CONFIG = {
     "buffer_size": 2,           # Hysteresis buffer for turnover control
     "label_horizon": 1,         # Forward return prediction horizon (Reduced from 5)
     "topk": 4,                  # Number of top ETFs to recommend (Reduced from 5)
+    "target_vol": 0.20,         # [NEW] Default target volatility
 }
 
 # Output Config

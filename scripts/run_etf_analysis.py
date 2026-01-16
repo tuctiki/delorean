@@ -23,11 +23,11 @@ def parse_args() -> argparse.Namespace:
     """
     parser = argparse.ArgumentParser(description="Run ETF Strategy Analysis")
     parser.add_argument("--topk", type=int, default=4, help="Number of stocks to hold in TopK strategy (default: 4)")
-    parser.add_argument("--target_vol", type=float, default=None, help="Annualized Target Volatility (e.g. 0.20). Default: None (Full Exposure)")
+    parser.add_argument("--target_vol", type=float, default=0.20, help="Annualized Target Volatility (e.g. 0.20). Default: 0.20")
     parser.add_argument("--use_alpha158", action="store_true", help="Use Qlib Alpha158 embedded factors")
     parser.add_argument("--use_hybrid", action="store_true", help="Use Hybrid Factors (Custom + Alpha158)")
     parser.add_argument("--risk_parity", action="store_true", help="Enable Volatility Targeting (1/Vol)")
-    parser.add_argument("--dynamic_exposure", action="store_true", help="Enable Trend-based Dynamic Exposure")
+    parser.add_argument("--dynamic_exposure", action="store_true", help="Enable Trend-based Dynamic Exposure (Asset > MA60)")
     parser.add_argument("--buffer", type=int, default=2, help="Rank Buffer for Hysteresis (default: 2)")
     parser.add_argument("--label_horizon", type=int, default=1, help="Forward return label horizon in days (default: 1)")
     parser.add_argument("--seed", type=int, default=42, help="Random seed for reproducibility")
@@ -41,7 +41,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--experiment_name", type=str, default=None, help="Custom MLflow Experiment Name")
     
     # Walk-Forward Validation
-    parser.add_argument("--walk_forward", action="store_true", help="Use walk-forward validation (matches live trading behavior)")
+    parser.add_argument("--no_walk_forward", action="store_false", dest="walk_forward", help="Disable walk-forward validation")
+    parser.set_defaults(walk_forward=True)
     parser.add_argument("--train_window_months", type=int, default=24, help="Training window in months for walk-forward (default: 24)")
     parser.add_argument("--retrain_frequency_months", type=int, default=1, help="Retrain frequency in months for walk-forward (default: 1)")
     
@@ -96,12 +97,31 @@ def main() -> None:
         validator = WalkForwardValidator(config=config)
         pred = validator.run(test_start, test_end)
         
+        # Prepare Position Control Data for Walk-Forward
+        vol_feature = None
+        if args.risk_parity or args.target_vol:
+            print("Fetching Volatility Data for Risk Parity / Target Vol (Walk-Forward)...")
+            try:
+                from qlib.data import D
+                # Fetch VOL20 for all instruments in market
+                # Note: We need to ensure we fetch enough history
+                vol_data = D.features(D.instruments(market=QLIB_REGION), ['Std($close/Ref($close,1)-1, 20)'], start_time=START_TIME, end_time=END_TIME)
+                vol_data.columns = ['VOL20']
+                vol_feature = vol_data['VOL20']
+            except Exception as e:
+                print(f"Warning: Failed to fetch VOL20 data: {e}")
+                vol_feature = None
+
         # Run backtest with walk-forward predictions
         backtest_engine = BacktestEngine(pred)
         report, positions = backtest_engine.run(
             topk=args.topk,
             n_drop=1,
             buffer=args.buffer,
+            use_trend_filter=args.dynamic_exposure,
+            use_regime_filter=True,
+            vol_feature=vol_feature,
+            target_vol=args.target_vol,
             start_time=test_start,
             end_time=None
         )
@@ -125,7 +145,6 @@ def main() -> None:
                 # Calculate Rank IC for walk-forward predictions
                 try:
                     from delorean.utils import calculate_rank_ic
-                    from delorean.data import ETFDataLoader
                     
                     # Load labels for the entire test period to calculate IC
                     loader = ETFDataLoader(label_horizon=args.label_horizon)
@@ -317,6 +336,8 @@ def main() -> None:
             buffer=strategy_params["buffer"],
             vol_feature=vol_feature,
             target_vol=strategy_params["target_vol"],
+            use_trend_filter=strategy_params["dynamic_exposure"],
+            use_regime_filter=True,
             start_time=test_start,
             end_time=None # Let Engine determine safe end date from sliced pred
         )

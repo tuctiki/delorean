@@ -30,7 +30,8 @@ cd /Users/jinjing/workspace/delorean && conda run -n quant python scripts/run_et
 - MLflow experiment logged to `mlruns/`
 
 ## Notes
-- The backtest uses the current strategy configuration from `delorean/config.py`
+- **Defaults Enabled**: Walk-Forward Validation, Asymmetric Volatility Scaling (Regime Filter + 20% Target Vol) are now **on by default**.
+- To disable them, use `--no_walk_forward` or `--no_regime_filter`.
 - Optimized Parameters: TopK=4, Smooth Window=10, Label Horizon=1 (Daily Prediction)
 - Results will be visible in the Experiments page of the dashboard
 

@@ -4,6 +4,15 @@ import logging
 
 logger = logging.getLogger("delorean.strategy.portfolio")
 
+# Asymmetric Volatility Settings
+BULL_TARGET_VOL = 0.30  # Relaxed in bull markets (allow full gains)
+BEAR_TARGET_VOL = 0.12  # Aggressive in bear markets (protect capital)
+
+# Hysteresis Thresholds (to reduce turnover from frequent regime switching)
+# Set to 1.0 to disable hysteresis (original Phase 9 behavior)
+BULL_THRESHOLD = 1.0   # Ratio must exceed this to trigger "Bull" mode
+BEAR_THRESHOLD = 1.0   # Ratio must fall below this to trigger "Bear" mode
+
 class PortfolioOptimizer:
     """
     Handles portfolio construction and weighting allocation.
@@ -11,22 +20,45 @@ class PortfolioOptimizer:
     def __init__(self, topk: int = 5, risk_degree: float = 0.95):
         self.topk = topk
         self.risk_degree = risk_degree
+        self._last_regime = "neutral"  # Track last regime for hysteresis
         
     def calculate_weights(self, target_stocks: List[str], current_date: pd.Timestamp, 
-                          vol_feature: Optional[pd.Series] = None, target_vol: Optional[float] = None) -> Dict[str, float]:
+                          vol_feature: Optional[pd.Series] = None, target_vol: Optional[float] = None,
+                          regime_ratio: Optional[float] = None) -> Dict[str, float]:
         """
         Calculate target weights (Risk Parity if vol available, else Equal Weight).
+        
+        Args:
+            regime_ratio: Market regime indicator (Price/MA60). >1.0 = Bull, <1.0 = Bear.
+                          If provided, target_vol is dynamically adjusted with hysteresis.
         """
         weights = {}
         if not target_stocks:
             return weights
+        
+        # === Asymmetric Target Vol Logic with Hysteresis ===
+        effective_target_vol = target_vol
+        if regime_ratio is not None and target_vol is not None:
+            # Hysteresis Logic: Only switch regime if threshold is exceeded
+            if regime_ratio >= BULL_THRESHOLD:
+                self._last_regime = "bull"
+            elif regime_ratio <= BEAR_THRESHOLD:
+                self._last_regime = "bear"
+            # else: keep _last_regime unchanged (neutral zone)
+            
+            if self._last_regime == "bull":
+                effective_target_vol = max(target_vol, BULL_TARGET_VOL)
+                logger.debug(f"Bull Regime ({regime_ratio:.2f}): target_vol={effective_target_vol}")
+            elif self._last_regime == "bear":
+                effective_target_vol = min(target_vol, BEAR_TARGET_VOL)
+                logger.debug(f"Bear Regime ({regime_ratio:.2f}): target_vol={effective_target_vol}")
             
         # 1. Base Allocation (Risk Parity or Equal Weight)
+        avg_vol = 0.0
         if vol_feature is not None:
              # Get volatility for these stocks on this date
              inv_vols = {}
              sum_inv_vol = 0.0
-             avg_vol = 0.0
              valid_count = 0
              
              for code in target_stocks:
@@ -63,23 +95,14 @@ class PortfolioOptimizer:
                  weights[code] = ew
              
              # Warning: Without vol feature, we can't do accurate Vol Targeting
-             # We assume a default vol if not provided? No, just skip scaling if no vol data
              avg_vol = 0.0
 
         # 2. Target Volatility Scaling (De-leveraging)
-        # If Target Vol is enabled and we have vol data
-        if target_vol is not None and avg_vol > 0:
-            # Annualize the daily vol (assuming input vol is daily std)
-            # vol_feature typicaly is Std(Returns, 20). 
-            # Annualized Vol = Daily Vol * sqrt(252)
+        if effective_target_vol is not None and avg_vol > 0:
             ann_vol_est = avg_vol * (252 ** 0.5)
             
-            if ann_vol_est > target_vol:
-                # Scale down exposure
-                scale_factor = target_vol / ann_vol_est
-                # Cap at 1.0 (No leverage) -> Already implied since scale_factor < 1 if vol > target
-                
-                # Apply scale
+            if ann_vol_est > effective_target_vol:
+                scale_factor = effective_target_vol / ann_vol_est
                 for code in weights:
                     weights[code] *= scale_factor
                     
@@ -88,3 +111,4 @@ class PortfolioOptimizer:
             weights[code] *= self.risk_degree
 
         return weights
+

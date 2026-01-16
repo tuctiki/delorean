@@ -181,7 +181,7 @@ def generate_production_signal(today: datetime.datetime, config: dict) -> pd.Ser
 
 def build_recommendation_artifact(
     pred: pd.Series,
-    is_bull: bool,
+    regime_ratio: float,
     market_data: dict,
     validation_metrics: dict,
     config: dict
@@ -191,7 +191,7 @@ def build_recommendation_artifact(
     
     Args:
         pred: Smoothed predictions for latest date.
-        is_bull: Bull market status.
+        regime_ratio: Market regime ratio (1.0 = Bull, 0.0 = Bear).
         market_data: Market regime data (close, ma).
         validation_metrics: Validation phase results.
         config: Configuration dict.
@@ -213,13 +213,23 @@ def build_recommendation_artifact(
         "smooth_window": smooth_window,
         "buffer": buffer_size,
         "label_horizon": label_horizon,
-        "mode": "Equal Weight + Global HS300 Filter"
+        "target_vol": config.get("target_vol", 0.20),
+        "mode": "Equal Weight + Asymmetric Vol Scaling"
     }
     
+    # Identify Market Status
+    if regime_ratio >= 1.0:
+        market_status = "STREET BULL (Risk On)"
+    elif regime_ratio <= 0.0:
+        market_status = "BEAR MARKET (Risk Off)"
+    else:
+        market_status = f"NEUTRAL/TRANSITION ({regime_ratio:.2f})"
+
     artifact = {
         "date": latest_date.strftime('%Y-%m-%d'),
         "generation_time": datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-        "market_status": "BULL (Always Invested)",
+        "market_status": market_status,
+        "regime_ratio": float(regime_ratio),
         "validation": validation_metrics,
         "strategy_config": strategy_config,
         "top_recommendations": [],
@@ -239,22 +249,47 @@ def build_recommendation_artifact(
         vol_map = feat_df['vol20'].to_dict()
         close_map = feat_df['close'].to_dict()
     
+    # Calculate Dynamic Target Volatility
+    # Bull = 30%, Bear = 12%
+    base_target = config.get("target_vol", 0.20)
+    bull_vol = 0.30
+    bear_vol = 0.12
+    dynamic_target_vol = regime_ratio * bull_vol + (1.0 - regime_ratio) * bear_vol
+    artifact["dynamic_target_vol"] = float(dynamic_target_vol)
+
+    # Calculate Top-K Average Volatility for Scaling
+    topk_symbols = latest_pred.head(topk).index.tolist()
+    topk_vols = [vol_map.get(s, 0.0) for s in topk_symbols]
+    avg_vol_topk = sum(topk_vols) / len(topk_vols) if topk_vols else 0.0
+    ann_vol_est = avg_vol_topk * (252 ** 0.5)
+    
+    # Scaling Factor
+    scale_factor = 1.0
+    if ann_vol_est > dynamic_target_vol and ann_vol_est > 0:
+        scale_factor = dynamic_target_vol / ann_vol_est
+    
+    artifact["vol_scale_factor"] = float(scale_factor)
+    artifact["estimated_ann_vol"] = float(ann_vol_est)
+
     # Populate recommendations
-    if is_bull:
-        for i, (symbol, score) in enumerate(latest_pred.head(topk + buffer_size).items(), 1):
-            is_buffer = i > topk
-            weight = 1.0 / topk if not is_buffer else 0.0
-            
-            artifact["top_recommendations"].append({
-                "rank": i,
-                "symbol": symbol,
-                "name": ETF_NAME_MAP.get(symbol, symbol),
-                "score": float(score),
-                "volatility": float(vol_map.get(symbol, 0.0)),
-                "current_price": float(close_map.get(symbol, 0.0)),
-                "target_weight": float(weight),
-                "is_buffer": is_buffer
-            })
+    for i, (symbol, score) in enumerate(latest_pred.head(topk + buffer_size).items(), 1):
+        is_buffer = i > topk
+        
+        # Base weight is Equal Weight among Top-K
+        base_weight = 1.0 / topk if not is_buffer else 0.0
+        # Final weight scales by target vol factor
+        weight = base_weight * scale_factor
+        
+        artifact["top_recommendations"].append({
+            "rank": i,
+            "symbol": symbol,
+            "name": ETF_NAME_MAP.get(symbol, symbol),
+            "score": float(score),
+            "volatility": float(vol_map.get(symbol, 0.0)),
+            "current_price": float(close_map.get(symbol, 0.0)),
+            "target_weight": float(weight),
+            "is_buffer": is_buffer
+        })
     
     # Full rankings
     for symbol, score in latest_pred.items():
@@ -267,7 +302,7 @@ def build_recommendation_artifact(
     return artifact
 
 
-def print_recommendations(pred: pd.Series, config: dict, is_bull: bool) -> None:
+def print_recommendations(pred: pd.Series, config: dict, regime_ratio: float) -> None:
     """Print formatted recommendations to console."""
     latest_date = pred.index.get_level_values('datetime').max()
     latest_pred = pred.loc[latest_date].sort_values(ascending=False)
@@ -276,6 +311,7 @@ def print_recommendations(pred: pd.Series, config: dict, is_bull: bool) -> None:
     buffer_size = config["buffer_size"]
     
     print(f"\n[Result] Latest Signal Date: {latest_date.strftime('%Y-%m-%d')}")
+    print(f"[Market] Regime Ratio: {regime_ratio:.2f} ({'BULL' if regime_ratio >= 1.0 else 'BEAR' if regime_ratio <= 0.0 else 'TRANSITION'})")
     
     print("\n" + "-"*30)
     print(f"  Top {topk} Recommendations")
@@ -291,6 +327,7 @@ def print_recommendations(pred: pd.Series, config: dict, is_bull: bool) -> None:
     print(f"- Target Hold: Top {topk}")
     print(f"- Buffer Logic (Hysteresis): Keep existing holdings if Rank <= {topk + buffer_size}.")
     print("- Turnover Control: Only swap if Rank > {topk + buffer_size}.")
+    print(f"- Portfolio Mode: Asymmetric Vol Scaling (Current Ratio: {regime_ratio:.2f})")
 
 
 def get_trading_signal(topk: int = None) -> None:
@@ -319,13 +356,31 @@ def get_trading_signal(topk: int = None) -> None:
     # Phase 2: Production signals
     pred_smooth = generate_production_signal(today, config)
     
-    # Market status (always bull, no regime filter)
-    print("\n[Market Status] Always invested (Regime Filter Removed)")
-    is_bull = True
+    # Market status (CSI300 > MA60)
+    print("\n[Market Status] Calculating Regime Ratio...")
+    try:
+        # Fetch Benchmark Data for Regime Filter
+        # Use a generous window to ensure we have enough data for MA60
+        bench_df = D.features([BENCHMARK], ['$close', 'Mean($close, 60)'], 
+                             start_time=(today - datetime.timedelta(days=120)).strftime("%Y-%m-%d"), 
+                             end_time=today.strftime("%Y-%m-%d"))
+        
+        if bench_df.empty:
+            print("  Warning: No benchmark data for regime filter. Defaulting to BULL.")
+            regime_ratio = 1.0
+        else:
+            latest_bench = bench_df.iloc[-1]
+            close = latest_bench['$close']
+            ma60 = latest_bench['Mean($close, 60)']
+            regime_ratio = 1.0 if close >= ma60 else 0.0
+            print(f"  > CSI300: {close:.2f} | MA60: {ma60:.2f} | Ratio: {regime_ratio}")
+    except Exception as e:
+        print(f"  Warning: Regime filter calculation failed: {e}. Defaulting to BULL.")
+        regime_ratio = 1.0
     
     # Build and save artifact
     artifact = build_recommendation_artifact(
-        pred_smooth, is_bull, {}, validation_metrics, config
+        pred_smooth, regime_ratio, {}, validation_metrics, config
     )
     
     with open("daily_recommendations.json", "w") as f:
@@ -333,7 +388,7 @@ def get_trading_signal(topk: int = None) -> None:
     print("\n[Artifact] Saved to 'daily_recommendations.json'")
     
     # Print results
-    print_recommendations(pred_smooth, config, is_bull)
+    print_recommendations(pred_smooth, config, regime_ratio)
 
 
 if __name__ == "__main__":
