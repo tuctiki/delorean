@@ -32,12 +32,18 @@ When asked to "review factors," "audit the portfolio," or "suggest improvements"
 
 1.  **Load Factor Pool**: Retrieve the list of currently active formulas/expressions.
 2.  **Backtest (Out-of-Sample)**: Run simulations specifically on the most recent data period (e.g., last 6 months) to check for decay.
-3.  **Correlation Clustering**:
+3.  **Horizon Validation (Crucial)**:
+    - **Check**: Does the factor's intended horizon (e.g. 1-day) match the audit horizon (e.g. 5-day)?
+    - *Action*: If mismatched, re-evaluate on the intended horizon OR smooth the factor to extend its signal life.
+
+4.  **Correlation Clustering**:
     - Group factors by similarity.
     - If two factors have Correlation > 0.7, keep the one with the higher Sharpe Ratio; mark the other for **REMOVAL**.
-4.  **Diagnostics**:
-    - *High Turnover?* -> Recommendation: "Apply a smoothing function like `Decay` or `Ma`."
+
+5.  **Diagnostics & Rework**:
+    - *High Turnover (> 60%)?* -> **Mandatory**: "Apply `Mean(x, 5)` or `Decay(x, 5)` to reduce noise."
     - *Low Volatility?* -> Recommendation: "Multiply by a volatility regime filter."
+    - *Horizon Mismatch?* -> Recommendation: "Retest on 1-day label or Smooth for 5-day target."
 5.  **Reporting**: Output a table of actions and a summary of future research directions.
 
 ## 4. Tools & Libraries

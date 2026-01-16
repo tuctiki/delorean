@@ -20,32 +20,35 @@ def mine_alphas():
     audit_start = "2024-01-01"
     audit_end = "2025-12-31" 
     
-    # 3. Candidate Pool (Phase 12: Bull Trend Alphas - Reduced Turnover)
-    # Focus: Longer lookbacks (30-60 days), Trend Confirmation, Stable signals
+    # 3. Candidate Pool (Phase 15: Trend Efficiency & Volume Flow)
+    # Focus: 5-Day Horizon, Smoothed for Stability
     candidates = {
-        # Long-Term Momentum (60-day): More stable than 10-day
-        "LT_Momentum_60": "($close / Ref($close, 60) - 1)",
+        # Efficiency Ratio (Kaufman): Abs(Net Change) / Sum(Abs(Change))
+        # Measures trend smoothness. Higher = Smoother trend.
+        "Efficiency_Ratio_20": "Mean(Abs($close - Ref($close, 20)) / Sum(Abs($close - Ref($close, 1)), 20), 5)",
         
-        # Trend Strength (Price > MA): Positive only when in uptrend
-        "Trend_Strength_30": "If($close > Mean($close, 30), ($close / Mean($close, 30) - 1), 0)",
+        # Money Flow Multiplier Proxy:
+        # CMF-like: Volume weighted by location in daily range
+        "Money_Flow_20": "Mean(Sum((($close - $low) - ($high - $close)) / ($high - $low + 0.001) * $volume, 20) / Sum($volume, 20), 5)",
         
-        # Smooth Momentum (EMA-based): Less noisy than simple returns
-        "Smooth_Momentum": "Mean($close / Ref($close, 1) - 1, 20)",
+        # Volatility Breakout (Normalized):
+        # Distance from 60d High, scaled by ATR
+        "Vol_Breakout_60": "Mean(($close - Mean($close, 60)) / (Std($close, 60) + 0.001), 5)",
         
-        # Price Position: Where is price in its 60-day range (0-1)
-        "Price_Position": "($close - Min($close, 60)) / (Max($close, 60) - Min($close, 60) + 0.001)",
+        # Volume Price Trend (VPT) - Simplified Rate of Change
+        # Volume * %Price Change
+        "VPT_Proxy_10": "Mean(Sum($volume * ($close/Ref($close, 1)-1), 10) / Mean($volume, 20), 5)",
         
-        # 52-Week High Proximity: Near high = strong trend
-        "High_Proximity": "$close / Max($close, 60)",
-        
-        # Dual MA Cross: Bullish when fast > slow (binary -> continuous strength)
-        "MA_Cross_Strength": "Mean($close, 10) / Mean($close, 30) - 1",
+        # Downside Deviation Ratio (Sortino-like proxy):
+        # Upside Vol / Downside Vol
+        "Up_Down_Vol_Ratio": "Mean(Std(If($close > Ref($close,1), $close/Ref($close,1)-1, 0), 20) / (Std(If($close < Ref($close,1), $close/Ref($close,1)-1, 0), 20) + 0.001), 5)",
     }
     
     logger.info(f"Mining {len(candidates)} Candidates on {audit_start} to {audit_end}...")
     
     # 4. Fetch Data
-    fields = list(candidates.values()) + ["Ref($close, -1) / $close - 1"] # Label
+    # Align w/ Strategy: Use 5-day forward return as label
+    fields = list(candidates.values()) + ["Ref($close, -5) / $close - 1"] # Label (5-Day)
     names = list(candidates.keys()) + ["label"]
     
     try:

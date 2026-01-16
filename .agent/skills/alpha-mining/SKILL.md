@@ -30,11 +30,16 @@ When asked to "mine alpha" or "find signals":
     - *Constraint*: Ensure no look-ahead bias (do not use future data for current predictions).
 
 4.  **Validation**:
-    - **Pass Criteria**: 
-        - Information Ratio (IR) > 0.05
-        - Sharpe Ratio > 1.0
-        - Turnover < 50%
-    - If a factor fails, refine the formula and repeat.
+    - **Pass Criteria** (Must align with Alpha Evaluation): 
+        - **Information Coefficient (IC)**: > 0.03 (for target horizon)
+        - **Sharpe Ratio**: > 1.5 (Annualized)
+        - **Turnover**: < 60% (Daily) - *Strict limit*
+    - **Horizon Check**:
+        - Explicitly define the target horizon (e.g., `5-Day` vs `1-Day`).
+        - *Crucial*: If mining for the standardized strategy, use **5-Day Forward Return** as the label (`Ref($close, -5) / $close - 1`).
+    - **Turnover Mitigation**:
+        - If Turnover > 60%, apply smoothing immediately: `Mean(Formula, 5)` or `Decay(Formula, 5)`.
+    - If a factor fails these, refine or discard.
 
 ## 3. Tools & Libraries
 Use the available Python environment to execute these tasks. Preferred libraries:
