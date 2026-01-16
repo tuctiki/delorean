@@ -90,9 +90,14 @@ class SimpleTopkStrategy(BaseSignalStrategy):
                 logger.debug(f"Trend filter failed for {trade_start_time}: {e}")
 
         # 4. Portfolio Optimization (Target Weights)
+        # [NEW] Dynamic TopK: Reduce holdings in Bear Market to concentrate quality
+        current_topk = self.topk
+        if current_regime is not None and current_regime <= 0.97:
+            current_topk = 2
+            
         # Sort and take top K candidates for weighting
         sorted_score = pred_score.sort_values(ascending=False)
-        target_stocks = sorted_score.head(self.topk).index.tolist()
+        target_stocks = sorted_score.head(current_topk).index.tolist()
         
         target_weights = self.optimizer.calculate_weights(
             target_stocks, 

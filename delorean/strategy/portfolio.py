@@ -106,6 +106,26 @@ class PortfolioOptimizer:
                 for code in weights:
                     weights[code] *= scale_factor
                     
+        # 3. Dynamic Trend-Based Leverage Cap
+        # Continuous scaling based on Regime Ratio (Price / MA60)
+        # Ratio <= 0.97 (Bear) -> Cap at 20%
+        # Ratio 1.00 (Weak Bull) -> Cap at ~60%
+        # Ratio >= 1.03 (Strong Bull) -> Cap at 100%
+        if regime_ratio is not None:
+             trend_score = max(0, regime_ratio - 0.97)
+             # Slope = 13.3: (1.03 - 0.97) * 13.3 = 0.8 + 0.20 = 1.0
+             dynamic_leverage = 0.20 + (trend_score * 13.3)
+             dynamic_leverage = min(1.0, dynamic_leverage)
+             
+             # Apply the stricter of Vol Scaling or Trend Cap
+             # If Vol Scaling (scale_factor) is already lower, it persists.
+             # If Vol Scaling allows 95%, but Trend Cap is 20%, we clip to 20%.
+             total_weight = sum(weights.values())
+             if total_weight > dynamic_leverage:
+                 cap_factor = dynamic_leverage / total_weight
+                 for code in weights:
+                     weights[code] *= cap_factor
+
         # Apply Risk Degree (Cash buffer)
         for code in weights:
             weights[code] *= self.risk_degree
