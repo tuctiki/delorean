@@ -45,7 +45,7 @@ export default function Home() {
     }
   }, [status]);
 
-  const isMarketBull = recs?.market_status === 'Bull';
+  const isMarketBull = recs?.market_status?.includes('BULL') || recs?.regime_ratio >= 1.0;
 
   // Validation Colors
   const getStatusColor = (status) => {
@@ -136,7 +136,11 @@ export default function Home() {
               </div>
               <div className={styles.statRow}>
                 <span>Benchmark MA60</span>
-                <strong>{recs?.market_data?.benchmark_ma60?.toFixed(2) || recs?.market_data?.benchmark_ma?.toFixed(2) || '-'}</strong>
+                <strong>{recs?.market_data?.benchmark_ma60?.toFixed(2) || '-'}</strong>
+              </div>
+              <div className={styles.statRow}>
+                <span>Regime Ratio</span>
+                <strong style={{ color: isMarketBull ? '#7ee787' : '#f85149' }}>{recs?.regime_ratio?.toFixed(3) || '-'}</strong>
               </div>
             </div>
           )}
