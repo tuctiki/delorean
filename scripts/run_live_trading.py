@@ -386,17 +386,43 @@ def get_trading_signal(topk: int = None) -> None:
         if regime_series.empty:
             print("  Warning: No benchmark data for regime filter. Defaulting to BULL.")
             regime_ratio = 1.01
+            benchmark_close = None
+            benchmark_ma60 = None
         else:
             regime_ratio = regime_series.iloc[-1]
             print(f"  > CSI300 Price/MA60 Ratio: {regime_ratio:.4f}")
+            # Extract benchmark price and MA60 for dashboard
+            try:
+                from qlib.data import D
+                bench_df = D.features([BENCHMARK], ["$close"], 
+                                     start_time=(today - datetime.timedelta(days=120)).strftime("%Y-%m-%d"),
+                                     end_time=today.strftime("%Y-%m-%d"))
+                if not bench_df.empty:
+                    bench_series = bench_df.droplevel(0)['$close']
+                    benchmark_close = float(bench_series.iloc[-1])
+                    benchmark_ma60 = float(bench_series.rolling(60).mean().iloc[-1])
+                else:
+                    benchmark_close = None
+                    benchmark_ma60 = None
+            except:
+                benchmark_close = None
+                benchmark_ma60 = None
     except Exception as e:
         print(f"  Warning: Regime filter calculation failed: {e}. Defaulting to BULL.")
         regime_ratio = 1.01
+        benchmark_close = None
+        benchmark_ma60 = None
     
     # Build and save artifact
     artifact = build_recommendation_artifact(
         pred_smooth, regime_ratio, 0.0, validation_metrics, config
     )
+    
+    # Add market data for dashboard
+    artifact["market_data"] = {
+        "benchmark_close": benchmark_close,
+        "benchmark_ma60": benchmark_ma60
+    }
     
     with open("daily_recommendations.json", "w") as f:
         json.dump(artifact, f, indent=2)
