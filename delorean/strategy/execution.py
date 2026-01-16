@@ -7,10 +7,11 @@ class ExecutionModel:
     """
     Handles order generation with turnover control (buffer).
     """
-    def __init__(self, topk: int = 5, buffer: int = 2, n_drop: int = 1):
+    def __init__(self, topk: int = 5, buffer: int = 2, n_drop: int = 1, rebalance_threshold: float = 0.05):
         self.topk = topk
         self.buffer = buffer
         self.n_drop = n_drop
+        self.rebalance_threshold = rebalance_threshold  # Default increased to 5%
         
     def generate_orders(self, 
                         current_pos: Any, 
@@ -74,7 +75,7 @@ class ExecutionModel:
                     
         # 4. Generate Buy/Rebalance Orders
         current_total_value = current_temp.calculate_value()
-        buffer_val_threshold = current_total_value * 0.02
+        buffer_val_threshold = current_total_value * self.rebalance_threshold  # Use configurable threshold
         
         for code in final_targets:
             if code not in target_weights: continue # Should generally overlap

@@ -36,7 +36,12 @@ class SimpleTopkStrategy(BaseSignalStrategy):
         
         # Initialize Sub-Models
         self.optimizer = PortfolioOptimizer(topk=topk, risk_degree=risk_degree)
-        self.execution = ExecutionModel(topk=topk, buffer=buffer, n_drop=n_drop)
+        self.execution = ExecutionModel(
+            topk=topk, 
+            buffer=buffer, 
+            n_drop=n_drop,
+            rebalance_threshold=kwargs.get('rebalance_threshold', 0.05)  # Default 5%
+        )
 
     def generate_trade_decision(self, execute_result: Any = None) -> TradeDecisionWO:
         """
@@ -160,6 +165,8 @@ class BacktestEngine:
             use_trend_filter (bool): Whether to enable the per-asset trend filter (Default: False).
             use_regime_filter (bool): Whether to enable the market regime trend filter (Default: False).
             target_vol (float): Annualized Target Volatility (e.g. 0.20 for 20%). None = No targeting.
+            signal_halflife (int): EMA smoothing halflife in days for prediction scores (Default: None = No smoothing).
+            rebalance_threshold (float): Rebalancing threshold as fraction of portfolio value (Default: 0.02).
             **kwargs: Additional strategy parameters (drop_rate, n_drop).
 
         Returns:
@@ -167,7 +174,17 @@ class BacktestEngine:
             and a dictionary of position details.
         """
 
-        print(f"\nRunning Backtest (Custom SimpleTopkStrategy, TopK={topk}, Trend={'On' if use_trend_filter else 'Off'}, Regime={'On' if use_regime_filter else 'Off'}, Params={kwargs})...")
+        # Apply signal smoothing if requested (TURNOVER REDUCTION)
+        signal_halflife = kwargs.get('signal_halflife', None)
+        pred_to_use = self.pred
+        
+        if signal_halflife is not None and signal_halflife > 0:
+            from delorean.signals import smooth_predictions
+            print(f"Applying EMA smoothing to predictions (halflife={signal_halflife} days)...")
+            pred_to_use = smooth_predictions(self.pred, halflife=signal_halflife)
+        
+        print(f"\nRunning Backtest (Custom SimpleTopkStrategy, TopK={topk}, Trend={'On' if use_trend_filter else 'Off'}, Regime={'On' if use_regime_filter else 'Off'}, SignalSmoothing={signal_halflife}, Params={kwargs})...")
+        
         # Fetch Trend Feature if needed
         trend_feature = None
         if use_trend_filter:
@@ -178,7 +195,7 @@ class BacktestEngine:
             # To be safe, fetch for the whole range of pred
             
             # Extract time range from pred index
-            time_idx = self.pred.index.get_level_values('datetime')
+            time_idx = pred_to_use.index.get_level_values('datetime')
             start_t = time_idx.min()
             end_t = time_idx.max()
             
@@ -204,7 +221,7 @@ class BacktestEngine:
             from delorean.utils import fetch_regime_ratio
             try:
                 # Need consistent time range
-                time_idx = self.pred.index.get_level_values('datetime')
+                time_idx = pred_to_use.index.get_level_values('datetime')
                 start_t = time_idx.min()
                 end_t = time_idx.max()
                 
@@ -215,14 +232,20 @@ class BacktestEngine:
 
 
         # Strategy Config
+        # Filter out engine-only parameters before passing to strategy
+        filtered_kwargs = {k: v for k, v in kwargs.items() 
+                          if k not in ['signal_halflife', 'rebalance_threshold', 'vol_feature', 'buffer', 'n_drop']}
+        
         STRATEGY_CONFIG = {
             "topk": topk,
             "risk_degree": 0.95,
-            "signal": self.pred,
+            "signal": pred_to_use,  # Use smoothed predictions
             "trend_feature": trend_feature,
             "regime_feature": regime_feature,
             "target_vol": kwargs.get('target_vol', None),
-            **kwargs # Pass drop_rate and n_drop
+            "buffer": kwargs.get('buffer', 2),
+            "n_drop": kwargs.get('n_drop', 1),
+            **filtered_kwargs
         }
 
         EXECUTOR_CONFIG = {

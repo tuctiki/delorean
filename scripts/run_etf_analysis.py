@@ -28,10 +28,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--use_hybrid", action="store_true", help="Use Hybrid Factors (Custom + Alpha158)")
     parser.add_argument("--risk_parity", action="store_true", help="Enable Volatility Targeting (1/Vol)")
     parser.add_argument("--dynamic_exposure", action="store_true", help="Enable Trend-based Dynamic Exposure (Asset > MA60)")
-    parser.add_argument("--buffer", type=int, default=2, help="Rank Buffer for Hysteresis (default: 2)")
+    parser.add_argument("--buffer", type=int, default=3, help="Rank Buffer for Hysteresis (default: 3, increased from 2)")
     parser.add_argument("--label_horizon", type=int, default=1, help="Forward return label horizon in days (default: 1)")
     parser.add_argument("--seed", type=int, default=42, help="Random seed for reproducibility")
     parser.add_argument("--smooth_window", type=int, default=10, help="EWMA smoothing halflife (days). Higher = Lower Turnover.")
+    parser.add_argument("--signal_halflife", type=int, default=3, help="EMA smoothing halflife for prediction scores. None or 0 = No smoothing (default: 3)")
+    parser.add_argument("--rebalance_threshold", type=float, default=0.05, help="Rebalancing threshold as fraction of portfolio (default: 0.05 = 5%%)")
     
     # Time Range Overrides
     parser.add_argument("--start_time", type=str, default=None, help="Backtest Data Start Time (e.g. 2015-01-01)")
@@ -40,9 +42,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--end_time", type=str, default=None, help="Backtest End Time (e.g. 2025-12-31)")
     parser.add_argument("--experiment_name", type=str, default=None, help="Custom MLflow Experiment Name")
     
-    # Walk-Forward Validation
+    # Walk-Forward Validation (NOW DEFAULT)
     parser.add_argument("--no_walk_forward", action="store_false", dest="walk_forward", help="Disable walk-forward validation")
-    parser.set_defaults(walk_forward=True)
+    parser.set_defaults(walk_forward=True)  # Walk-forward is now the default
     parser.add_argument("--train_window_months", type=int, default=24, help="Training window in months for walk-forward (default: 24)")
     parser.add_argument("--retrain_frequency_months", type=int, default=1, help="Retrain frequency in months for walk-forward (default: 1)")
     
@@ -118,6 +120,8 @@ def main() -> None:
             use_regime_filter=True,
             vol_feature=vol_feature,
             target_vol=args.target_vol,
+            signal_halflife=args.signal_halflife,
+            rebalance_threshold=args.rebalance_threshold,
             start_time=test_start,
             end_time=None
         )
@@ -328,6 +332,8 @@ def main() -> None:
             target_vol=strategy_params["target_vol"],
             use_trend_filter=strategy_params["dynamic_exposure"],
             use_regime_filter=True,
+            signal_halflife=args.signal_halflife,
+            rebalance_threshold=args.rebalance_threshold,
             start_time=test_start,
             end_time=None # Let Engine determine safe end date from sliced pred
         )
