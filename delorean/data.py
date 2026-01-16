@@ -27,7 +27,7 @@ class ETFDataHandler(DataHandlerLP):
             "Sum(If($close > Ref($close, 1), 1, 0), 10) / 10",  # Mom_Persistence (IC=0.059)
             "($close / Ref($close, 5) - 1) - (Ref($close, 5) / Ref($close, 10) - 1)",  # Acceleration (IC=0.053)
             # Vol_Price_Div with 5-day smoothing
-            "Mean(-1 * Corr($close / Ref($close, 1), $volume / Ref($volume, 1), 10), 5)",  # Vol_Price_Div (Smoothed 5d)
+            "Mean(Corr($close / Ref($close, 1), $volume / Ref($volume, 1), 10), 5)",  # Vol_Price_Div (Smoothed 5d)
             # === DEFENSIVE FACTOR (2026-01-15) ===
             "Corr($close / Ref($close, 1) - 1, (Mean(If($close > Ref($close, 1), $close - Ref($close, 1), 0), 14) / (Mean(Abs($close - Ref($close, 1)), 14) + 0.0001)), 10)",  # RSI_Divergence (IC=-0.0305)
             # === ROUND 3 FACTORS (2026-01-16) ===
