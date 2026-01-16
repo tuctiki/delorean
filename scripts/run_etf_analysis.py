@@ -101,13 +101,9 @@ def main() -> None:
         vol_feature = None
         if args.risk_parity or args.target_vol:
             print("Fetching Volatility Data for Risk Parity / Target Vol (Walk-Forward)...")
+            from delorean.utils import fetch_volatility_feature
             try:
-                from qlib.data import D
-                # Fetch VOL20 for all instruments in market
-                # Note: We need to ensure we fetch enough history
-                vol_data = D.features(D.instruments(market=QLIB_REGION), ['Std($close/Ref($close,1)-1, 20)'], start_time=START_TIME, end_time=END_TIME)
-                vol_data.columns = ['VOL20']
-                vol_feature = vol_data['VOL20']
+                vol_feature = fetch_volatility_feature(ETF_LIST, START_TIME, END_TIME)
             except Exception as e:
                 print(f"Warning: Failed to fetch VOL20 data: {e}")
                 vol_feature = None
@@ -315,16 +311,10 @@ def main() -> None:
         vol_feature = None
         # We need vol feature if risk_parity OR target_vol is enabled
         if args.risk_parity or args.target_vol:
-            # We need VOL20. 
             print("Fetching Volatility Data for Risk Parity / Target Vol...")
-            # Fetch explicitly via Qlib
+            from delorean.utils import fetch_volatility_feature
             try:
-                from qlib.data import D
-                # Std($close/Ref($close,1)-1, 20)
-                # Note: Qlib expressions need to be exact.
-                vol_data = D.features(D.instruments(market=QLIB_REGION), ['Std($close/Ref($close,1)-1, 20)'], start_time=START_TIME, end_time=END_TIME)
-                vol_data.columns = ['VOL20']
-                vol_feature = vol_data['VOL20']
+                vol_feature = fetch_volatility_feature(ETF_LIST, START_TIME, END_TIME)
             except Exception as e:
                 print(f"Warning: Failed to fetch VOL20 data: {e}")
                 vol_feature = None

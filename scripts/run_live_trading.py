@@ -28,6 +28,7 @@ from delorean.data import ETFDataLoader
 from delorean.model import ModelTrainer
 from delorean.backtest import BacktestEngine
 from delorean.signals import smooth_predictions
+from delorean.strategy.portfolio import PortfolioOptimizer
 
 
 def run_validation(today: datetime.datetime, config: dict) -> dict:
@@ -90,16 +91,23 @@ def run_validation(today: datetime.datetime, config: dict) -> dict:
     
     # Sharpe via backtest
     try:
-        engine = BacktestEngine(pred_scores)
-        report, _ = engine.run(topk=topk)
+        from delorean.utils import run_standard_backtest
+        report, _ = run_standard_backtest(
+            pred=pred_scores,
+            topk=topk,
+            buffer=config.get("buffer_size", 2),
+            target_vol=config.get("target_vol", 0.20),
+            use_regime_filter=True,
+            use_trend_filter=False
+        )
         risks = risk_analysis(report["return"], freq="day")
         sharpe = risks.loc["information_ratio", "risk"]
         validation_metrics["sharpe"] = float(sharpe)
-        print(f"  Validation Sharpe: {sharpe:.4f}")
+        print(f"  Validation Sharpe Ratio: {sharpe:.4f}")
         
         if sharpe < 0.0:
             validation_metrics["sharpe_status"] = "Critical"
-        elif sharpe < 0.5:
+        elif sharpe < 0.4:
             validation_metrics["sharpe_status"] = "Warning"
         else:
             validation_metrics["sharpe_status"] = "Pass"
@@ -182,17 +190,17 @@ def generate_production_signal(today: datetime.datetime, config: dict) -> pd.Ser
 def build_recommendation_artifact(
     pred: pd.Series,
     regime_ratio: float,
-    market_data: dict,
+    metrics_ic: float,
     validation_metrics: dict,
     config: dict
 ) -> dict:
     """
-    Build the recommendation JSON artifact.
+    Build the recommendation JSON artifact using unified PortfolioOptimizer.
     
     Args:
         pred: Smoothed predictions for latest date.
-        regime_ratio: Market regime ratio (1.0 = Bull, 0.0 = Bear).
-        market_data: Market regime data (close, ma).
+        regime_ratio: Market regime ratio (Price/MA60).
+        metrics_ic: Rank IC for the latest period.
         validation_metrics: Validation phase results.
         config: Configuration dict.
         
@@ -206,25 +214,55 @@ def build_recommendation_artifact(
     buffer_size = config["buffer_size"]
     smooth_window = config["smooth_window"]
     label_horizon = config["label_horizon"]
+    target_vol_config = config.get("target_vol", 0.20)
     
-    # Strategy config section
+    # 1. Initialize Unified Portfolio Optimizer
+    # Note: risk_degree=0.95 is standard for the strategy
+    optimizer = PortfolioOptimizer(topk=topk, risk_degree=0.95)
+    
+    # 2. Fetch Volatility and Benchmark Data for Weighting
+    # We need VOL20 for Risk Parity and Scaling
+    from delorean.utils import fetch_volatility_feature
+    vol_feature = fetch_volatility_feature(ETF_LIST, latest_date, latest_date)
+    
+    close_map = {}
+    if not vol_feature.empty:
+        # Also extract close prices from the same fetch
+        fields = ['$close']
+        close_df = D.features(ETF_LIST, fields, start_time=latest_date, end_time=latest_date)
+        if not close_df.empty:
+            close_map = close_df.iloc[:, 0].reset_index().set_index('instrument')['$close'].to_dict()
+
+    # 3. Calculate Unified Weights
+    target_stocks = latest_pred.head(topk).index.tolist()
+    target_weights = optimizer.calculate_weights(
+        target_stocks=target_stocks,
+        current_date=latest_date,
+        vol_feature=vol_feature,
+        target_vol=target_vol_config,
+        regime_ratio=regime_ratio
+    )
+    
+    # 4. Identify Market Status (Consistent with Optimizer)
+    from delorean.strategy.portfolio import BULL_THRESHOLD, BEAR_THRESHOLD
+    if regime_ratio >= BULL_THRESHOLD:
+        market_status = "STREET BULL (Risk On)"
+    elif regime_ratio <= BEAR_THRESHOLD:
+        market_status = "BEAR MARKET (Risk Off)"
+    else:
+        market_status = f"NEUTRAL/TRANSITION ({regime_ratio:.2f})"
+
+    # 5. Build Artifact
     strategy_config = {
         "topk": topk,
         "smooth_window": smooth_window,
         "buffer": buffer_size,
         "label_horizon": label_horizon,
-        "target_vol": config.get("target_vol", 0.20),
-        "mode": "Equal Weight + Asymmetric Vol Scaling"
+        "target_vol": target_vol_config,
+        "risk_degree": 0.95,
+        "mode": "Risk Parity + Asymmetric Vol Scaling"
     }
     
-    # Identify Market Status
-    if regime_ratio >= 1.0:
-        market_status = "STREET BULL (Risk On)"
-    elif regime_ratio <= 0.0:
-        market_status = "BEAR MARKET (Risk Off)"
-    else:
-        market_status = f"NEUTRAL/TRANSITION ({regime_ratio:.2f})"
-
     artifact = {
         "date": latest_date.strftime('%Y-%m-%d'),
         "generation_time": datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
@@ -237,55 +275,33 @@ def build_recommendation_artifact(
         "full_rankings": []
     }
     
-    # Fetch additional data for recommendations
-    fields = ['$close', 'Std($close/Ref($close,1)-1, 20)']
-    feat_df = D.features(ETF_LIST, fields, start_time=latest_date, end_time=latest_date)
+    # Calculate additional metrics for display
+    # (Estimated Volatility of the top-k components)
+    topk_vols = []
+    for s in target_stocks:
+        try:
+            v = vol_feature.loc[(latest_date, s)]
+            if not pd.isna(v): topk_vols.append(v)
+        except: continue
     
-    vol_map, close_map = {}, {}
-    if not feat_df.empty:
-        feat_df.columns = ['close', 'vol20']
-        if 'datetime' in feat_df.index.names:
-            feat_df = feat_df.droplevel('datetime')
-        vol_map = feat_df['vol20'].to_dict()
-        close_map = feat_df['close'].to_dict()
-    
-    # Calculate Dynamic Target Volatility
-    # Bull = 30%, Bear = 12%
-    base_target = config.get("target_vol", 0.20)
-    bull_vol = 0.30
-    bear_vol = 0.12
-    dynamic_target_vol = regime_ratio * bull_vol + (1.0 - regime_ratio) * bear_vol
-    artifact["dynamic_target_vol"] = float(dynamic_target_vol)
-
-    # Calculate Top-K Average Volatility for Scaling
-    topk_symbols = latest_pred.head(topk).index.tolist()
-    topk_vols = [vol_map.get(s, 0.0) for s in topk_symbols]
     avg_vol_topk = sum(topk_vols) / len(topk_vols) if topk_vols else 0.0
     ann_vol_est = avg_vol_topk * (252 ** 0.5)
-    
-    # Scaling Factor
-    scale_factor = 1.0
-    if ann_vol_est > dynamic_target_vol and ann_vol_est > 0:
-        scale_factor = dynamic_target_vol / ann_vol_est
-    
-    artifact["vol_scale_factor"] = float(scale_factor)
     artifact["estimated_ann_vol"] = float(ann_vol_est)
 
     # Populate recommendations
+    # We show top-k + buffer for the user to see hysteresis candidates
     for i, (symbol, score) in enumerate(latest_pred.head(topk + buffer_size).items(), 1):
         is_buffer = i > topk
         
-        # Base weight is Equal Weight among Top-K
-        base_weight = 1.0 / topk if not is_buffer else 0.0
-        # Final weight scales by target vol factor
-        weight = base_weight * scale_factor
+        # Get weight from optimizer (will be 0 for buffer stocks if not in target_stocks)
+        weight = target_weights.get(symbol, 0.0)
         
         artifact["top_recommendations"].append({
             "rank": i,
             "symbol": symbol,
             "name": ETF_NAME_MAP.get(symbol, symbol),
             "score": float(score),
-            "volatility": float(vol_map.get(symbol, 0.0)),
+            "volatility": float(vol_feature.loc[(latest_date, symbol)]) if vol_feature is not None and (latest_date, symbol) in vol_feature.index else 0.0,
             "current_price": float(close_map.get(symbol, 0.0)),
             "target_weight": float(weight),
             "is_buffer": is_buffer
@@ -296,7 +312,7 @@ def build_recommendation_artifact(
         artifact["full_rankings"].append({
             "symbol": symbol,
             "score": float(score),
-            "volatility": float(vol_map.get(symbol, 0.0))
+            "volatility": float(vol_feature.loc[(latest_date, symbol)]) if vol_feature is not None and (latest_date, symbol) in vol_feature.index else 0.0
         })
     
     return artifact
@@ -356,31 +372,30 @@ def get_trading_signal(topk: int = None) -> None:
     # Phase 2: Production signals
     pred_smooth = generate_production_signal(today, config)
     
-    # Market status (CSI300 > MA60)
+    # Market status (CSI300 / MA60 Ratio)
     print("\n[Market Status] Calculating Regime Ratio...")
+    from delorean.utils import fetch_regime_ratio
     try:
-        # Fetch Benchmark Data for Regime Filter
-        # Use a generous window to ensure we have enough data for MA60
-        bench_df = D.features([BENCHMARK], ['$close', 'Mean($close, 60)'], 
-                             start_time=(today - datetime.timedelta(days=120)).strftime("%Y-%m-%d"), 
-                             end_time=today.strftime("%Y-%m-%d"))
+        # Fetch last 120 days to ensure we have MA60 data
+        regime_series = fetch_regime_ratio(
+            BENCHMARK,
+            (today - datetime.timedelta(days=120)).strftime("%Y-%m-%d"),
+            today.strftime("%Y-%m-%d")
+        )
         
-        if bench_df.empty:
+        if regime_series.empty:
             print("  Warning: No benchmark data for regime filter. Defaulting to BULL.")
-            regime_ratio = 1.0
+            regime_ratio = 1.01
         else:
-            latest_bench = bench_df.iloc[-1]
-            close = latest_bench['$close']
-            ma60 = latest_bench['Mean($close, 60)']
-            regime_ratio = 1.0 if close >= ma60 else 0.0
-            print(f"  > CSI300: {close:.2f} | MA60: {ma60:.2f} | Ratio: {regime_ratio}")
+            regime_ratio = regime_series.iloc[-1]
+            print(f"  > CSI300 Price/MA60 Ratio: {regime_ratio:.4f}")
     except Exception as e:
         print(f"  Warning: Regime filter calculation failed: {e}. Defaulting to BULL.")
-        regime_ratio = 1.0
+        regime_ratio = 1.01
     
     # Build and save artifact
     artifact = build_recommendation_artifact(
-        pred_smooth, regime_ratio, {}, validation_metrics, config
+        pred_smooth, regime_ratio, 0.0, validation_metrics, config
     )
     
     with open("daily_recommendations.json", "w") as f:

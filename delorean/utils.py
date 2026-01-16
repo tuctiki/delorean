@@ -7,7 +7,7 @@ import pandas as pd
 import logging
 import random
 import numpy as np
-from typing import Optional
+from typing import Optional, Union, List, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -119,3 +119,130 @@ def get_benchmark_ma_ratio(
         logger.error(f"Failed to fetch benchmark MA ratio: {e}")
         return pd.Series(dtype=float)
 
+
+def fetch_regime_ratio(
+    benchmark: str,
+    start_time: Union[str, pd.Timestamp],
+    end_time: Union[str, pd.Timestamp]
+) -> pd.Series:
+    """
+    Fetch market regime ratio (Price/MA60) for the benchmark.
+    
+    This is the primary regime detection signal used by the strategy:
+    - Ratio >= 1.0: Bull market (price above 60-day MA)
+    - Ratio < 1.0: Bear market (price below 60-day MA)
+    
+    Args:
+        benchmark: Benchmark instrument code (e.g., "510300.SH").
+        start_time: Start date for data fetch.
+        end_time: End date for data fetch.
+        
+    Returns:
+        pd.Series indexed by datetime with regime ratio values.
+        Returns empty Series on error.
+    """
+    from qlib.data import D
+    
+    try:
+        fields = ['$close / Mean($close, 60)']
+        feat_df = D.features([benchmark], fields, start_time=start_time, end_time=end_time)
+        
+        if feat_df.empty:
+            logger.warning(f"No regime data returned for {benchmark}")
+            return pd.Series(dtype=float)
+        
+        # Extract Series and drop instrument level (single benchmark)
+        regime_series = feat_df.iloc[:, 0]
+        if regime_series.index.nlevels > 1:
+            regime_series = regime_series.droplevel('instrument')
+        
+        return regime_series
+    except Exception as e:
+        logger.error(f"Failed to fetch regime ratio for {benchmark}: {e}")
+        return pd.Series(dtype=float)
+
+
+def fetch_volatility_feature(
+    instruments: Union[str, List[str]],
+    start_time: Union[str, pd.Timestamp],
+    end_time: Union[str, pd.Timestamp]
+) -> pd.Series:
+    """
+    Fetch 20-day rolling volatility for given instruments.
+    
+    This is used for Risk Parity weighting and Target Volatility scaling.
+    
+    Args:
+        instruments: Single instrument code or list of codes.
+        start_time: Start date for data fetch.
+        end_time: End date for data fetch.
+        
+    Returns:
+        pd.Series indexed by (datetime, instrument) with VOL20 values.
+        Returns empty Series on error.
+    """
+    from qlib.data import D
+    
+    # Normalize to list
+    if isinstance(instruments, str):
+        instruments = [instruments]
+    
+    try:
+        fields = ['Std($close/Ref($close,1)-1, 20)']
+        vol_df = D.features(instruments, fields, start_time=start_time, end_time=end_time)
+        
+        if vol_df.empty:
+            logger.warning(f"No volatility data returned for instruments")
+            return pd.Series(dtype=float)
+        
+        # Return as Series with (datetime, instrument) index
+        vol_series = vol_df.iloc[:, 0]
+        return vol_series
+    except Exception as e:
+        logger.error(f"Failed to fetch volatility feature: {e}")
+        return pd.Series(dtype=float)
+
+
+def run_standard_backtest(
+    pred: pd.Series,
+    topk: int,
+    buffer: int = 2,
+    target_vol: float = 0.20,
+    use_regime_filter: bool = True,
+    use_trend_filter: bool = False,
+    start_time: Optional[str] = None,
+    end_time: Optional[str] = None
+) -> Tuple[pd.DataFrame, dict]:
+    """
+    Run backtest with standard strategy parameters.
+    
+    This is a convenience wrapper around BacktestEngine that applies
+    the canonical strategy configuration used across the codebase.
+    
+    Args:
+        pred: Prediction scores indexed by (datetime, instrument).
+        topk: Number of stocks to hold.
+        buffer: Rank buffer for hysteresis (default: 2).
+        target_vol: Annualized target volatility (default: 0.20).
+        use_regime_filter: Enable market regime filter (default: True).
+        use_trend_filter: Enable per-asset trend filter (default: False).
+        start_time: Backtest start time (optional).
+        end_time: Backtest end time (optional).
+        
+    Returns:
+        Tuple of (report DataFrame, positions dict).
+    """
+    from delorean.backtest import BacktestEngine
+    
+    engine = BacktestEngine(pred)
+    report, positions = engine.run(
+        topk=topk,
+        buffer=buffer,
+        target_vol=target_vol,
+        use_regime_filter=use_regime_filter,
+        use_trend_filter=use_trend_filter,
+        start_time=start_time,
+        end_time=end_time
+    )
+    
+    return report, positions

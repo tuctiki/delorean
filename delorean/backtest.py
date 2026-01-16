@@ -196,23 +196,17 @@ class BacktestEngine:
         # Fetch Regime Feature if needed
         regime_feature = None
         if use_regime_filter:
-            from qlib.data import D
-            # Expression: $close / Mean($close, 60) for BENCHMARK
+            from delorean.utils import fetch_regime_ratio
             try:
                 # Need consistent time range
                 time_idx = self.pred.index.get_level_values('datetime')
                 start_t = time_idx.min()
                 end_t = time_idx.max()
                 
-                fields = ['$close / Mean($close, 60)']
-                # Fetch for Benchmark Only
-                feat_df = D.features([BENCHMARK], fields, start_time=start_t, end_time=end_t)
-                if not feat_df.empty:
-                     # Index is (datetime, instrument). We want Series indexed by datetime
-                     # Since it's one instrument, we can just reset index or xs
-                     regime_feature = feat_df.xs(BENCHMARK, level='instrument')['$close / Mean($close, 60)']
+                regime_feature = fetch_regime_ratio(BENCHMARK, start_t, end_t)
             except Exception as e:
-                 print(f"Warning: Failed to fetch Regime Feature for backtest: {e}")
+                print(f"Warning: Failed to fetch Regime Feature for backtest: {e}")
+
 
 
         # Strategy Config

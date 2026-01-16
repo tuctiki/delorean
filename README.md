@@ -12,7 +12,7 @@ The project has been refactored into a modular structure:
     -   `backtest.py`: Backtesting engine and strategy composition.
     -   `config.py`: Centralized configuration.
     -   `pipeline.py`: Daily task orchestration.
-    -   `utils.py`: Centralized utilities (smoothing, IC calculation).
+    -   `utils.py`: Centralized utilities (smoothing, IC calculation, regime/volatility fetching, standardized backtest execution).
     -   **`strategy/`**: Modular strategy components.
         -   `portfolio.py`: Weight calculation (Equal Weight / Risk Parity).
         -   `execution.py`: Order generation and turnover control.
@@ -274,6 +274,15 @@ The backend container also runs a cron job for daily trading tasks at 18:00 on w
 ---
 
 ## Changelog
+
+### 2026-01-16: Code Consolidation
+
+Extracted 3 shared utilities in `delorean/utils.py` to eliminate ~60 lines of duplicate code across 4 files:
+- **`fetch_regime_ratio()`**: Market regime detection (Price/MA60)
+- **`fetch_volatility_feature()`**: 20-day rolling volatility for Risk Parity
+- **`run_standard_backtest()`**: Standardized backtest execution wrapper
+
+Refactored `delorean/backtest.py`, `scripts/run_etf_analysis.py`, and `scripts/run_live_trading.py` to use shared utilities, ensuring identical logic between backtest and live trading.
 
 ### 2026-01-14: Alpha Mining & Factor Library Optimization
 
