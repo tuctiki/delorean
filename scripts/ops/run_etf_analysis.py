@@ -64,53 +64,61 @@ def main() -> None:
             os.remove(p_path)
 
     # Walk-Forward Logic (Keep inline for now as it's complex to abstract entirely yet)
-    if args.walk_forward:
-        # We can eventually move this to Runner too, but let's stick to standard flow first
-        from delorean.walk_forward import WalkForwardValidator, WalkForwardConfig
-        # ... (Walk Forward logic preserved for backward compat compatibility or moved if desired)
-        # For this refactor, let's keep it but ideally it should use Runner internally if possible.
-        # But WalkForwardValidator has its own Qlib logic. Let's leave WF as is but import logic?
-        # Re-implementing simplified WF dispatch:
-        fix_seed_and_init(args.seed) # Helper
-        
-        # ... [Keep existing WF logic block from original file if needed, or assume Runner is for Standard]
-        # For brevity in this refactor, I will focus on standard flow using Runner.
-        # However, to not break functionality, I should paste the WF block back or import it.
-        # Let's assume standard flow for Runner demonstration.
-        pass 
-
-    # === STANDARD EXECUTION USING RUNNER ===
+    # === UNIFIED EXECUTION ===
     runner = StrategyRunner(seed=args.seed, experiment_name=args.experiment_name)
     runner.initialize()
     
-    # 1. Load Data
-    print("Loading Data...")
-    dataset = runner.load_data(
-        start_time=start_time,
-        end_time=end_time,
-        train_end_time=train_end_time,
-        test_start_time=test_start_time,
-        label_horizon=args.label_horizon,
-        use_alpha158=args.use_alpha158,
-        use_hybrid=args.use_hybrid
-    )
+    pred = None
+    dataset = None
 
-    # 2. Factor Analysis
-    print("Running Factor Analysis...")
-    factor_analyzer = FactorAnalyzer()
-    factor_analyzer.analyze(dataset)
+    if args.walk_forward:
+        # --- Mode A: Walk-Forward Validation ---
+        print(f"Running Walk-Forward Validation (Train Window: {args.train_window_months}m, Freq: {args.retrain_frequency_months}m)")
+        from delorean.walk_forward import WalkForwardValidator, WalkForwardConfig
+        
+        wf_config = WalkForwardConfig(
+            train_window_months=args.train_window_months,
+            retrain_frequency_months=args.retrain_frequency_months,
+            seed=args.seed,
+            smooth_window=args.smooth_window,
+            label_horizon=args.label_horizon
+        )
+        validator = WalkForwardValidator(wf_config)
+        # validator.run expects strings
+        pred = validator.run(test_start=test_start_time, test_end=end_time)
+        
+    else:
+        # --- Mode B: Standard Fixed-Split Validation ---
+        print("Running Standard Fixed-Split Validation")
+        
+        # 1. Load Data
+        print("Loading Data...")
+        dataset = runner.load_data(
+            start_time=start_time,
+            end_time=end_time,
+            train_end_time=train_end_time,
+            test_start_time=test_start_time,
+            label_horizon=args.label_horizon,
+            use_alpha158=args.use_alpha158,
+            use_hybrid=args.use_hybrid
+        )
 
-    # 3. Train Model
-    opt_config = OptimizationConfig(
-        use_alpha158=args.use_alpha158,
-        use_hybrid=args.use_hybrid,
-        smooth_window=args.smooth_window,
-        target_vol=args.target_vol
-    )
-    pred = runner.train_model(optimize_config=opt_config)
+        # 2. Factor Analysis
+        print("Running Factor Analysis...")
+        factor_analyzer = FactorAnalyzer()
+        factor_analyzer.analyze(dataset)
 
-    # 4. Slice Predictions
-    pred = slice_predictions(pred, test_start_time, end_time)
+        # 3. Train Model
+        opt_config = OptimizationConfig(
+            use_alpha158=args.use_alpha158,
+            use_hybrid=args.use_hybrid,
+            smooth_window=args.smooth_window,
+            target_vol=args.target_vol
+        )
+        pred = runner.train_model(optimize_config=opt_config)
+
+        # 4. Slice Predictions
+        pred = slice_predictions(pred, test_start_time, end_time)
 
     # 5. Backtest
     with runner.run_experiment(params=vars(args)) as recorder:
@@ -139,6 +147,7 @@ def main() -> None:
         # Analysis
         analyzer = ResultAnalyzer()
         analyzer.process(report, positions)
+        
         log_artifacts(recorder)
 
 def fix_seed_and_init(seed):
