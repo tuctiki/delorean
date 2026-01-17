@@ -43,7 +43,7 @@ class DailyPipeline:
             raise e
 
     def step_download(self):
-        self._run_script("scripts/download_etf_data_to_csv.py", "Step 1/3: Download Data")
+        self._run_script("scripts/data/download_etf_data_to_csv.py", "Step 1/3: Download Data")
 
     def step_update_qlib(self):
         # Complex command for Qlib
@@ -64,7 +64,7 @@ class DailyPipeline:
         self._run_script(script_path, "Step 2/3: Update Qlib Database", args=args)
 
     def step_generate_signals(self):
-        self._run_script("scripts/run_live_trading.py", "Step 3/3: Generate Signals")
+        self._run_script("scripts/ops/run_live_trading.py", "Step 3/3: Generate Signals")
 
     def _run_script(self, rel_path: str, step_name: str, args: List[str] = None):
         logger.info(f"\n[{step_name}] Starting...")

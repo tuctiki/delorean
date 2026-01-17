@@ -18,7 +18,7 @@ import numpy as np
 from datetime import datetime
 from typing import List, Dict, Any
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 import qlib
 from delorean.config import (

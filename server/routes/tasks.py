@@ -63,7 +63,7 @@ def run_daily_task(background_tasks: BackgroundTasks):
     log_file = open(log_path, "w")
     
     TASK_PROCESS = subprocess.Popen(
-        [sys.executable, "-u", "scripts/run_daily_task.py"],
+        [sys.executable, "-u", "scripts/ops/run_daily_task.py"],
         cwd=project_root, 
         stdout=log_file,
         stderr=subprocess.STDOUT
@@ -123,7 +123,7 @@ def run_backtest(background_tasks: BackgroundTasks):
     log_file = open(log_path, "w")
     
     # Build command arguments from config
-    cmd = [sys.executable, "-u", "scripts/run_etf_analysis.py"]
+    cmd = [sys.executable, "-u", "scripts/ops/run_etf_analysis.py"]
     cmd.extend(["--start_time", DEFAULT_BACKTEST_PARAMS["start_time"]])
     cmd.extend(["--train_end_time", DEFAULT_BACKTEST_PARAMS["train_end_time"]])
     cmd.extend(["--test_start_time", DEFAULT_BACKTEST_PARAMS["test_start_time"]])

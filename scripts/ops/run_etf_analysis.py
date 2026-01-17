@@ -4,7 +4,7 @@ import qlib
 import sys
 import os
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from delorean.config import QLIB_PROVIDER_URI, QLIB_REGION, BENCHMARK, START_TIME, END_TIME, DEFAULT_EXPERIMENT_NAME, TEST_START_TIME, TRAIN_END_TIME
 from delorean.data import ETFDataLoader

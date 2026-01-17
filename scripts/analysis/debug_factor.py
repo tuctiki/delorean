@@ -5,7 +5,7 @@ import pandas as pd
 import numpy as np
 
 # Add project root
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
 
 from delorean.data import ETFDataLoader
 from delorean.config import ETF_LIST, QLIB_PROVIDER_URI

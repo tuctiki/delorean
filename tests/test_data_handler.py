@@ -10,22 +10,18 @@ def test_custom_factors_structure():
     assert isinstance(exprs, list)
     assert isinstance(names, list)
     assert len(exprs) == len(names)
-    assert len(names) == 7, f"Expected 7 factors, got {len(names)}"
+    assert len(names) == 5, f"Expected 5 factors, got {len(names)}"
     
 def test_custom_factors_contains_expected_factors():
-    """Test that all expected factor names are present (2026-01-14 Optimized 7-Factor Library)."""
+    """Test that all expected factor names are present."""
     _, names = ETFDataHandler.get_custom_factors()
     
-    # Optimized 7-factor library after 2026-01-14 audit
-    # Removed: VOL60 (negative IC), Mom20_VolAdj (redundant), Accel_Rev (redundant)
     expected_factors = [
-        "MarketCap_Liquidity",
-        "MOM60",
-        "MOM120", 
-        "Trend_Efficiency",
-        "Gap_Fill",
+        "MOM120",
         "Mom_Persistence",
-        "Acceleration",
+        "Money_Flow_20",
+        "RSI_Div_Cond",
+        "Alpha_Gen_8",
     ]
     
     for factor in expected_factors:

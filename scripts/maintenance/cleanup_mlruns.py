@@ -3,7 +3,7 @@ import shutil
 import sys
 import datetime
 
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
 MLRUNS_DIR = os.path.join(PROJECT_ROOT, "mlruns")
 print(f"Cleaning up {MLRUNS_DIR}...")
 
