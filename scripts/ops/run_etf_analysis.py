@@ -244,7 +244,7 @@ def log_backtest_metrics(report, pred, dataset, recorder):
             print(f"Rank IC calc failed: {e}")
 
         print(f"[MLflow] Logging Metrics: {metrics}")
-        recorder.log_metrics(**metrics)
+        R.log_metrics(**metrics)
         
     except Exception as e:
         print(f"Failed to log metrics: {e}")
