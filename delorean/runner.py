@@ -39,7 +39,8 @@ class StrategyRunner:
         qlib.init(provider_uri=QLIB_PROVIDER_URI, region=QLIB_REGION, kernels=1)
 
     def load_data(self, start_time: str, end_time: str, train_end_time: str, test_start_time: str,
-                  label_horizon: int = 1, use_alpha158: bool = False, use_hybrid: bool = False):
+                  label_horizon: int = 1, use_alpha158: bool = False, use_hybrid: bool = False,
+                  valid_start_time: str = None, valid_end_time: str = None):
         """Load Data using ETFDataLoader."""
         loader = ETFDataLoader(
             use_alpha158=use_alpha158,
@@ -51,12 +52,14 @@ class StrategyRunner:
         self.dataset = loader.load_data(
             train_start=start_time,
             train_end=train_end_time,
+            valid_start=valid_start_time,
+            valid_end=valid_end_time,
             test_start=test_start_time,
             test_end=end_time
         )
         return self.dataset
 
-    def train_model(self, optimize_config: Optional[OptimizationConfig] = None):
+    def train_model(self, model_type: str = "double_ensemble", optimize_config: Optional[OptimizationConfig] = None):
         """
         Train the model (and optionally run Stage 2 optimization).
         Returns predictions.
@@ -67,8 +70,8 @@ class StrategyRunner:
         self.model_trainer = ModelTrainer(seed=self.seed)
         
         # Stage 1: Initial Training
-        print("Stage 1: Initial Model Training...")
-        self.model_trainer.train(self.dataset)
+        print(f"Stage 1: Initial Model Training ({model_type})...")
+        self.model_trainer.train(self.dataset, model_type=model_type)
         self.pred = self.model_trainer.predict(self.dataset)
         
         # Stage 2: Optimization (Feature Selection)

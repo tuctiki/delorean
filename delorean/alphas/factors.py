@@ -4,7 +4,7 @@ Alpha Factor Registry.
 Central source of truth for all alpha factors used in the strategy.
 """
 
-# REFINED 5: Pruned and sign-flipped based on 2023-2025 Multi-Period Audit
+# REFINED 6: Includes Range_Pos_20 for structural bull markets
 # Last Updated: 2026-01-17
 PRODUCTION_FACTORS = [
     # (Expression, Name)
@@ -19,9 +19,14 @@ PRODUCTION_FACTORS = [
     # Smoothed Money Flow
     ("Mean(Sum((($close - $low) - ($high - $close)) / ($high - $low + 0.001) * $volume, 20) / Sum($volume, 20), 5)", "Money_Flow_20"),
 
+    # === BULL MARKET / STRUCTURAL ===
+    # Range_Pos_20: Captures structural breakouts in trending markets
+    ("($close - Min($low, 20)) / (Max($high, 20) - Min($low, 20) + 1e-4)", "Range_Pos_20"),
+
     # === MINED FACTORS ===
     ("-1 * (Sum(-1 * (Log($open)), 5) + Std($high, 5))", "Alpha_Gen_8"),
 ]
+
 
 
 def get_production_factors():

@@ -16,7 +16,9 @@ Delorean is a momentum-based ETF rotation strategy that:
 - **Momentum**: MOM60, MOM120 (Core trending signals)
 - **Volume / Flow**: Vol_Price_Div_Rev (**Sign-flipped** for modern regimes)
 - **Liquidity**: Money_Flow_20 (Accumulation/Distribution)
+- **Structural**: Range_Pos_20 (**New!** Bull market breakout signal)
 - **Mined**: Alpha_Gen_8 (Standardized genetic predictor)
+
 
 ### ML Architecture (NEW)
 - **Model**: DoubleEnsemble Architecture (based on Qlib)

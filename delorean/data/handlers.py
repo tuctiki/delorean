@@ -1,5 +1,5 @@
-
 from typing import List, Any
+import pandas as pd
 from qlib.data.dataset.handler import DataHandlerLP
 from qlib.data.dataset.processor import CSZScoreNorm, DropnaLabel
 from qlib.contrib.data.handler import Alpha158
@@ -95,3 +95,17 @@ class ETFHybridDataHandler(Alpha158):
         
         # Merge
         return (alpha158_exprs + custom_exprs, alpha158_names + custom_names)
+    def _fetch_data(self, *args, **kwargs):
+        """Override to ensure index types are consistent strings for Qlib."""
+        df = super()._fetch_data(*args, **kwargs)
+        if df is not None and not df.empty:
+            # Ensure index names
+            if df.index.names[0] is None:
+                df.index.names = ['datetime', 'instrument']
+            
+            # Reset and normalize to strings
+            df = df.reset_index()
+            df['datetime'] = pd.to_datetime(df['datetime']).dt.strftime('%Y-%m-%d')
+            df = df.set_index(['datetime', 'instrument']).sort_index()
+        return df
+

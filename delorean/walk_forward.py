@@ -139,9 +139,19 @@ class WalkForwardValidator:
                 end_time=pred_end
             )
             
+            # Define segments for DoubleEnsemble stability
+            # We need a validation segment before 'pred_start'
+            valid_start_dt = pd.Timestamp(pred_start) - pd.Timedelta(days=61)
+            valid_end_dt = pd.Timestamp(pred_start) - pd.Timedelta(days=1)
+            
+            # Adjusted training end to avoid overlap with validation
+            adjusted_train_end_dt = valid_start_dt - pd.Timedelta(days=1)
+            
             dataset = data_loader.load_data(
                 train_start=train_start,
-                train_end=train_end,
+                train_end=adjusted_train_end_dt.strftime('%Y-%m-%d'),
+                valid_start=valid_start_dt.strftime('%Y-%m-%d'),
+                valid_end=valid_end_dt.strftime('%Y-%m-%d'),
                 test_start=pred_start,
                 test_end=pred_end
             )
@@ -161,7 +171,8 @@ class WalkForwardValidator:
             # Train model
             model = ModelTrainer(seed=self.config.seed)
             try:
-                model.train(dataset)
+                # Align with live trading default: double_ensemble
+                model.train(dataset, model_type="double_ensemble")
             except ValueError as e:
                 if "Empty data" in str(e):
                     if verbose:

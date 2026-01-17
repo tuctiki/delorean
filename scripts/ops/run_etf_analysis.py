@@ -93,10 +93,19 @@ def main() -> None:
         
         # 1. Load Data
         print("Loading Data...")
+        # Calculate validation segment for DoubleEnsemble
+        ts_test_start = pd.Timestamp(test_start_time)
+        valid_start = (ts_test_start - pd.Timedelta(days=61)).strftime("%Y-%m-%d")
+        valid_end = (ts_test_start - pd.Timedelta(days=1)).strftime("%Y-%m-%d")
+        # Adjust train end to avoid overlap
+        adj_train_end = (ts_test_start - pd.Timedelta(days=62)).strftime("%Y-%m-%d")
+        
         dataset = runner.load_data(
             start_time=start_time,
             end_time=end_time,
-            train_end_time=train_end_time,
+            train_end_time=adj_train_end,
+            valid_start_time=valid_start,
+            valid_end_time=valid_end,
             test_start_time=test_start_time,
             label_horizon=args.label_horizon,
             use_alpha158=args.use_alpha158,
@@ -115,7 +124,9 @@ def main() -> None:
             smooth_window=args.smooth_window,
             target_vol=args.target_vol
         )
-        pred = runner.train_model(optimize_config=opt_config)
+        # Use DoubleEnsemble to align with live trading
+        pred = runner.train_model(model_type="double_ensemble", optimize_config=opt_config)
+
 
         # 4. Slice Predictions
         pred = slice_predictions(pred, test_start_time, end_time)

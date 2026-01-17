@@ -49,19 +49,28 @@ def run_validation(today: datetime.datetime, config: dict) -> dict:
     topk = config["topk"]
     
     val_split_date = today - datetime.timedelta(days=val_days)
-    val_train_end = (val_split_date - datetime.timedelta(days=1)).strftime("%Y-%m-%d")
+    # Define segments for DoubleEnsemble stability
+    val_train_start = "2015-01-01"
+    val_valid_start = (val_split_date - datetime.timedelta(days=61)).strftime("%Y-%m-%d")
+    val_valid_end = (val_split_date - datetime.timedelta(days=1)).strftime("%Y-%m-%d")
+    val_train_end = (val_split_date - datetime.timedelta(days=62)).strftime("%Y-%m-%d")
     val_test_start = val_split_date.strftime("%Y-%m-%d")
-    
-    print(f"  > Training Data: ... to {val_train_end}")
-    print(f"  > Test (Validation) Data: {val_test_start} to Present")
     
     # Load and train
     data_loader = ETFDataLoader(label_horizon=label_horizon)
-    dataset = data_loader.load_data(train_end=val_train_end, test_start=val_test_start)
+    dataset = data_loader.load_data(
+        train_start=val_train_start,
+        train_end=val_train_end,
+        valid_start=val_valid_start,
+        valid_end=val_valid_end,
+        test_start=val_test_start
+    )
     
     model = ModelTrainer()
     model.train(dataset, model_type="double_ensemble")
     pred_scores = model.predict(dataset)
+
+
     
     # Calculate metrics
     validation_metrics = {
@@ -166,21 +175,28 @@ def generate_production_signal(today: datetime.datetime, config: dict) -> pd.Ser
     smooth_window = config["smooth_window"]
     
     prod_split_date = today - datetime.timedelta(days=prod_split_days)
-    prod_train_end = (prod_split_date - datetime.timedelta(days=1)).strftime("%Y-%m-%d")
+    prod_train_start = "2015-01-01"
+    prod_valid_start = (prod_split_date - datetime.timedelta(days=61)).strftime("%Y-%m-%d")
+    prod_valid_end = (prod_split_date - datetime.timedelta(days=1)).strftime("%Y-%m-%d")
+    prod_train_end = (prod_split_date - datetime.timedelta(days=62)).strftime("%Y-%m-%d")
     prod_test_start = prod_split_date.strftime("%Y-%m-%d")
-    
-    print(f"  > Training Data: ... to {prod_train_end}")
-    print(f"  > Prediction Target: {prod_test_start} to Present")
     
     # Load and train
     data_loader = ETFDataLoader(label_horizon=label_horizon)
-    dataset = data_loader.load_data(train_end=prod_train_end, test_start=prod_test_start)
+    dataset = data_loader.load_data(
+        train_start=prod_train_start,
+        train_end=prod_train_end,
+        valid_start=prod_valid_start,
+        valid_end=prod_valid_end,
+        test_start=prod_test_start
+    )
     
     model = ModelTrainer()
     model.train(dataset, model_type="double_ensemble")
     pred = model.predict(dataset)
     
     # Smooth predictions
+
     print(f"  > Applying {smooth_window}-day EWMA Smoothing...")
     pred_smooth = smooth_predictions(pred, halflife=smooth_window)
     

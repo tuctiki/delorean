@@ -10,17 +10,18 @@ def test_custom_factors_structure():
     assert isinstance(exprs, (list, tuple))
     assert isinstance(names, (list, tuple))
     assert len(exprs) == len(names)
-    assert len(names) == 5, f"Expected 5 factors, got {len(names)}"
+    assert len(names) == 6, f"Expected 6 factors, got {len(names)}"
     
 def test_custom_factors_contains_expected_factors():
     """Test that all expected factor names are present."""
     _, names = ETFDataHandler.get_custom_factors()
     
     expected_factors = [
+        "MOM60",
         "MOM120",
-        "Mom_Persistence",
+        "Vol_Price_Div_Rev",
         "Money_Flow_20",
-        "RSI_Div_Cond",
+        "Range_Pos_20",
         "Alpha_Gen_8",
     ]
     
