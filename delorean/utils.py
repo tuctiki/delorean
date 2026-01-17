@@ -197,6 +197,9 @@ def fetch_volatility_feature(
         
         # Return as Series with (datetime, instrument) index
         vol_series = vol_df.iloc[:, 0]
+        # Qlib returns (instrument, datetime), so we swap levels
+        if vol_series.index.names == ['instrument', 'datetime']:
+             vol_series = vol_series.swaplevel().sort_index()
         return vol_series
     except Exception as e:
         logger.error(f"Failed to fetch volatility feature: {e}")
