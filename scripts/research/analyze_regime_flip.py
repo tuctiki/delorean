@@ -38,8 +38,8 @@ def main():
     # 2. Get Label
     label_expr = "Ref($close, -5) / $close - 1"
     
-    fields = exprs + [label_expr]
-    cols = names + ["label"]
+    fields = list(exprs) + [label_expr]
+    cols = list(names) + ["label"]
     
     df = D.features(ETF_LIST, fields, start_time=START, end_time=END, freq='day')
     df.columns = cols

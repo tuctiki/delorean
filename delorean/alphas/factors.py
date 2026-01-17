@@ -4,27 +4,31 @@ Alpha Factor Registry.
 Central source of truth for all alpha factors used in the strategy.
 """
 
-# REFINED 6: Includes Range_Pos_20 for structural bull markets
-# Last Updated: 2026-01-17
+# ULTRA 6 (1-Day Optimized): High-IC Selection Library
+# Focused on finding leadership and stability for daily rebalancing.
+# Last Updated: 2026-01-18
 PRODUCTION_FACTORS = [
     # (Expression, Name)
     
-    # === MOMENTUM ===
-    ("$close / Ref($close, 60) - 1", "MOM60"),
-    ("$close / Ref($close, 120) - 1", "MOM120"),
+    # === MOMENTUM & SKEW ===
+    # Vol_Skew_20: Anti-lottery effect. 2022-2025 IC: +0.054
+    ("-1 * Skew($close / Ref($close, 1) - 1, 20)", "Vol_Skew_20"),
+    # Selection_Trend: GP-Mined momentum multiplier. 2022-2025 IC: +0.028
+    ("Log(Abs($close / Ref($close, 20) - 1) + 1.0001) * Power(($close / Mean($close, 60) - 1), 2)", "Selection_Trend"),
     
-    # === VOLUME / FLOW ===
-    # Vol_Price_Div_Rev: Sign-flipped to capture mean-reversion in modern choppy markets
+    # === GP-MINED CORE ===
+    # Alpha_Gen_8: GP-Mined price-range signal. 2022-2025 IC: +0.029
+    ("-1 * (Sum(-1 * (Log($open + 1e-5)), 5) + Std($high, 5))", "Alpha_Gen_8"),
+    
+    # === VOL-PRICE DYNAMICS ===
+    # Vol_Price_Div_Rev: Mean-reversion confirmation. 2022-2025 IC: +0.029
     ("Mean(-1 * Corr($close / Ref($close, 1), $volume / Ref($volume, 1), 10), 5)", "Vol_Price_Div_Rev"),
-    # Smoothed Money Flow
-    ("Mean(Sum((($close - $low) - ($high - $close)) / ($high - $low + 0.001) * $volume, 20) / Sum($volume, 20), 5)", "Money_Flow_20"),
-
-    # === BULL MARKET / STRUCTURAL ===
-    # Range_Pos_20: Captures structural breakouts in trending markets
-    ("($close - Min($low, 20)) / (Max($high, 20) - Min($low, 20) + 1e-4)", "Range_Pos_20"),
-
-    # === MINED FACTORS ===
-    ("-1 * (Sum(-1 * (Log($open)), 5) + Std($high, 5))", "Alpha_Gen_8"),
+    
+    # === SHORT-TERM MEAN REVERSION (REVERSED) ===
+    # Smart_Flow_Rev: Captures liquidity exhaustion. 2022-2025 IC: +0.032
+    ("-1 * ($close - $low) / ($high - $low + 0.001) * (Mean($volume, 5) / Mean($volume, 20))", "Smart_Flow_Rev"),
+    # Gap_Fill_Rev: Short-term price reversal from gap extremes. 2022-2025 IC: +0.027
+    ("-1 * ($close - $open) / (Abs($open - Ref($close, 1)) + 0.001)", "Gap_Fill_Rev"),
 ]
 
 
