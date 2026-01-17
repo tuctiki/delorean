@@ -1,0 +1,28 @@
+Auditing Factors on Test Period: 2023-01-01 to 2099-12-31
+Fetching data...
+
+--- Factor Performance (Rank IC) ---
+MOM120              : IC = 0.0176
+Mom_Persistence     : IC = 0.0073
+Money_Flow_20       : IC = 0.0141
+RSI_Div_Cond        : IC = -0.0010
+Alpha_Gen_8         : IC = 0.0236
+
+--- Factor Correlation Matrix ---
+                   MOM120  Mom_Persistence  ...  RSI_Div_Cond  Alpha_Gen_8
+MOM120           1.000000         0.286885  ...     -0.341987     0.295426
+Mom_Persistence  0.286885         1.000000  ...     -0.333879     0.173698
+Money_Flow_20    0.356437         0.393484  ...     -0.410359     0.171618
+RSI_Div_Cond    -0.341987        -0.333879  ...      1.000000    -0.134967
+Alpha_Gen_8      0.295426         0.173698  ...     -0.134967     1.000000
+
+[5 rows x 5 columns]
+
+--- Audit Warnings ---
+[NOTE] MOM120 has WEAK IC (0.0176).
+[NOTE] Mom_Persistence has WEAK IC (0.0073).
+[NOTE] Money_Flow_20 has WEAK IC (0.0141).
+[WARNING] RSI_Div_Cond has NEGATIVE IC (-0.0010). Consider flipping sign or removing.
+
+--- Redundancy Check ---
+

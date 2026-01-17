@@ -1,0 +1,20 @@
+Auditing Factors on Period: 2025-01-01 to 2026-01-01
+Fetching data...
+
+--- Factor Performance (Rank IC) ---
+MOM120              : IC = -0.0114
+Money_Flow_20       : IC = -0.0061
+Alpha_Gen_8         : IC = 0.0256
+
+--- Factor Correlation Matrix ---
+                 MOM120  Money_Flow_20  Alpha_Gen_8
+MOM120         1.000000       0.211759     0.319584
+Money_Flow_20  0.211759       1.000000     0.155988
+Alpha_Gen_8    0.319584       0.155988     1.000000
+
+--- Audit Warnings ---
+[WARNING] MOM120 has NEGATIVE IC (-0.0114). Consider flipping sign or removing.
+[WARNING] Money_Flow_20 has NEGATIVE IC (-0.0061). Consider flipping sign or removing.
+
+--- Redundancy Check ---
+

@@ -1,0 +1,64 @@
+Initializing Custom ETF DataHandler (H=1)...
+Dataset Segments: {'train': ('2024-01-01', '2025-12-31'), 'test': ('2026-01-01', '2026-01-17')}
+Creating Dataset...
+Training set shape: (15819, 2)
+Features: ['Mean(Sum((($close - $low) - ($high - $close)) / ($high - $low + 0.001) * $volume, 20) / Sum($volume, 20), 5)', '-1 * (Sum(-1 * (Log($open)), 5) + Std($high, 5))']
+
+Training set correlation:
+                                                     Mean(Sum((($close - $low) - ($high - $close)) / ($high - $low + 0.001) * $volume, 20) / Sum($volume, 20), 5)  -1 * (Sum(-1 * (Log($open)), 5) + Std($high, 5))
+Mean(Sum((($close - $low) - ($high - $close)) /...                                               1.00                                                                                                         0.18
+-1 * (Sum(-1 * (Log($open)), 5) + Std($high, 5))                                                 0.18                                                                                                         1.00
+Training Model on 2024-2025 with Production Params...
+[20]	train's l2: 0.00029413
+[40]	train's l2: 0.000293755
+[60]	train's l2: 0.000293445
+[80]	train's l2: 0.000293173
+[100]	train's l2: 0.000292843
+[120]	train's l2: 0.000292469
+[140]	train's l2: 0.000292153
+[160]	train's l2: 0.00029186
+[180]	train's l2: 0.000291619
+[200]	train's l2: 0.000291413
+[220]	train's l2: 0.000291211
+[240]	train's l2: 0.000291021
+[260]	train's l2: 0.000290831
+[280]	train's l2: 0.000290637
+[300]	train's l2: 0.000290477
+[320]	train's l2: 0.000290339
+[340]	train's l2: 0.000290192
+[360]	train's l2: 0.000290064
+[380]	train's l2: 0.000289931
+[400]	train's l2: 0.000289812
+[420]	train's l2: 0.000289681
+[440]	train's l2: 0.000289561
+[460]	train's l2: 0.000289469
+[480]	train's l2: 0.000289364
+[500]	train's l2: 0.000289271
+[520]	train's l2: 0.000289184
+[540]	train's l2: 0.000289099
+[560]	train's l2: 0.000289021
+[580]	train's l2: 0.000288937
+[600]	train's l2: 0.000288853
+[620]	train's l2: 0.000288776
+[640]	train's l2: 0.000288707
+[660]	train's l2: 0.000288629
+[680]	train's l2: 0.00028856
+[700]	train's l2: 0.000288487
+[720]	train's l2: 0.000288421
+[740]	train's l2: 0.000288365
+[760]	train's l2: 0.000288309
+[780]	train's l2: 0.000288243
+[800]	train's l2: 0.000288189
+[820]	train's l2: 0.000288128
+[840]	train's l2: 0.000288071
+[860]	train's l2: 0.00028801
+[880]	train's l2: 0.000287961
+[900]	train's l2: 0.000287916
+[920]	train's l2: 0.000287876
+[940]	train's l2: 0.00028783
+[960]	train's l2: 0.000287786
+[980]	train's l2: 0.000287744
+[1000]	train's l2: 0.000287699
+
+--- Effective Feature Direction (Train Set) ---
+

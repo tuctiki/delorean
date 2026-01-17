@@ -20,31 +20,37 @@ The agent uses the following rubric to evaluate factors. Adjust these thresholds
 
 | Metric | Threshold for "KEEP" | Description |
 | :--- | :--- | :--- |
-| **Information Coefficient (IC)** | > 0.03 | Predictive power of the raw signal. |
-| **Sharpe Ratio** | > 1.5 | Risk-adjusted return (annualized). |
+| **Information Coefficient (IC)** | > 0.02 | Mean Predictive power across all periods. |
+| **Regime Stability** | > 70% | % of audited periods with positive Rank IC. |
+| **Sharpe Ratio** | > 1.0 | Risk-adjusted return (annualized). |
 | **Turnover** | < 60% (Daily) | Trading cost proxy. |
 | **Correlation** | < 0.7 | Similarity to existing approved factors. |
-| **Fitness Score** | Top 20% | Custom combined score (Returns * IC / Volatility). |
 
 ## 3. Workflow
 
 When asked to "review factors," "audit the portfolio," or "suggest improvements":
 
-1.  **Load Factor Pool**: Retrieve the list of currently active formulas/expressions.
-2.  **Backtest (Out-of-Sample)**: Run simulations specifically on the most recent data period (e.g., last 6 months) to check for decay.
-3.  **Horizon Validation (Crucial)**:
-    - **Check**: Does the factor's intended horizon (e.g. 1-day) match the audit horizon (e.g. 5-day)?
-    - *Action*: If mismatched, re-evaluate on the intended horizon OR smooth the factor to extend its signal life.
+1.  **Multi-Period Regime Audit**: 
+    - Retrieve the list of currently active formulas.
+    - Run Rank IC audits across defined regimes (e.g., Bull Market 19-20, Transition 21-22, Bear/Choppy 23-25, Recent 2025).
+    - Identify "Flipped" factors where Rank IC has reversed sign.
 
-4.  **Correlation Clustering**:
-    - Group factors by similarity.
-    - If two factors have Correlation > 0.7, keep the one with the higher Sharpe Ratio; mark the other for **REMOVAL**.
+2.  **Comparative Backtesting**: 
+    - Compare the **Full Library** against a **Refined Library** (pruned of noisy/decayed signals).
+    - If the Refined Library has a higher Sharpe/Return with lower Drawdown, suggest pruning.
 
-5.  **Diagnostics & Rework**:
-    - *High Turnover (> 60%)?* -> **Mandatory**: "Apply `Mean(x, 5)` or `Decay(x, 5)` to reduce noise."
-    - *Low Volatility?* -> Recommendation: "Multiply by a volatility regime filter."
-    - *Horizon Mismatch?* -> Recommendation: "Retest on 1-day label or Smooth for 5-day target."
-5.  **Reporting**: Output a table of actions and a summary of future research directions.
+3.  **Triage**:
+    - **KEEP**: Positive IC across most regimes and low correlation.
+    - **REMOVE**: Negative IC in modern regimes or High Correlation (> 0.7) with a better factor.
+    - **REWORK**: Sign-flipped factors or high-turnover signals.
+
+4.  **Diagnostics & Rework**:
+    - **Sign Flip**: If Rank IC is consistently negative in the modern regime but was positive historically, suggest a Sign Flip (multiply formula by -1).
+    - **High Turnover (> 60%)?** -> **Mandatory**: "Apply `Mean(x, 5)` or `Decay(x, 5)` to reduce noise."
+    - **Refinement**: Suggest moving to a smaller "Refined Ensemble" if it yields better out-of-sample performance.
+
+5.  **Reporting**: Output a table comparing metrics by Period and provide a "Refined Ensemble" recommendation.
+
 
 ## 4. Tools & Libraries
 

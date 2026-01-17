@@ -1,0 +1,29 @@
+Auditing Factors on Period: 2024-01-01 to 2024-12-31
+Fetching data...
+
+--- Factor Performance (Rank IC) ---
+MOM120              : IC = -0.0193
+Mom_Persistence     : IC = -0.0058
+Money_Flow_20       : IC = 0.0182
+RSI_Div_Cond        : IC = -0.0241
+Alpha_Gen_8         : IC = 0.0124
+
+--- Factor Correlation Matrix ---
+                   MOM120  Mom_Persistence  ...  RSI_Div_Cond  Alpha_Gen_8
+MOM120           1.000000         0.280607  ...     -0.399361     0.390734
+Mom_Persistence  0.280607         1.000000  ...     -0.347228     0.157143
+Money_Flow_20    0.349712         0.423318  ...     -0.413390     0.215142
+RSI_Div_Cond    -0.399361        -0.347228  ...      1.000000    -0.128694
+Alpha_Gen_8      0.390734         0.157143  ...     -0.128694     1.000000
+
+[5 rows x 5 columns]
+
+--- Audit Warnings ---
+[WARNING] MOM120 has NEGATIVE IC (-0.0193). Consider flipping sign or removing.
+[WARNING] Mom_Persistence has NEGATIVE IC (-0.0058). Consider flipping sign or removing.
+[NOTE] Money_Flow_20 has WEAK IC (0.0182).
+[WARNING] RSI_Div_Cond has NEGATIVE IC (-0.0241). Consider flipping sign or removing.
+[NOTE] Alpha_Gen_8 has WEAK IC (0.0124).
+
+--- Redundancy Check ---
+

@@ -12,12 +12,17 @@ Delorean is a momentum-based ETF rotation strategy that:
 
 ## Key Features
 
-### Alpha Factors (7 Total)
-- **Momentum**: MOM60, MOM120
-- **Structural**: Gap_Fill (mean reversion)
-- **Trend Quality**: Mom_Persistence, Acceleration
-- **Divergence**: Vol_Price_Div (volume-price correlation)
-- **Defensive**: RSI_Divergence
+### Alpha Factors (Refined 5)
+- **Momentum**: MOM60, MOM120 (Core trending signals)
+- **Volume / Flow**: Vol_Price_Div_Rev (**Sign-flipped** for modern regimes)
+- **Liquidity**: Money_Flow_20 (Accumulation/Distribution)
+- **Mined**: Alpha_Gen_8 (Standardized genetic predictor)
+
+### ML Architecture (NEW)
+- **Model**: DoubleEnsemble Architecture (based on Qlib)
+- **Features**: Regime-aware shuffling and sample reweighting
+- **Benefit**: Significantly reduces drawdown and "sign-flip" errors in choppy markets
+
 
 ### Portfolio Management
 - **Risk Parity Weighting**: Inverse volatility weights

@@ -60,7 +60,7 @@ def run_validation(today: datetime.datetime, config: dict) -> dict:
     dataset = data_loader.load_data(train_end=val_train_end, test_start=val_test_start)
     
     model = ModelTrainer()
-    model.train(dataset)
+    model.train(dataset, model_type="double_ensemble")
     pred_scores = model.predict(dataset)
     
     # Calculate metrics
@@ -177,7 +177,7 @@ def generate_production_signal(today: datetime.datetime, config: dict) -> pd.Ser
     dataset = data_loader.load_data(train_end=prod_train_end, test_start=prod_test_start)
     
     model = ModelTrainer()
-    model.train(dataset)
+    model.train(dataset, model_type="double_ensemble")
     pred = model.predict(dataset)
     
     # Smooth predictions

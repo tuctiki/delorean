@@ -33,10 +33,10 @@ class ETFDataHandler(DataHandlerLP):
             label_horizon (int): Number of days for forward return label (default: 1).
             **kwargs: Additional arguments passed to DataHandlerLP.
         """
-        custom_exprs, _ = self.get_custom_factors()
+        custom_exprs, custom_names = self.get_custom_factors()
         
         data_loader_config = {
-            "feature": custom_exprs, # Use the centralized definitions
+            "feature": (list(custom_exprs), list(custom_names)), # Use expressions AND names
             "label": [
                 f"Ref($close, -{label_horizon}) / $close - 1"  # Dynamic Horizon Return
             ],

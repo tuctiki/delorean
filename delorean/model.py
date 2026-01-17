@@ -1,35 +1,60 @@
 from typing import Any, Optional, List, Dict
 from qlib.contrib.model.gbdt import LGBModel
+from qlib.contrib.model.double_ensemble import DEnsembleModel
+
 from qlib.data.dataset import DatasetH
 from qlib.workflow import R
 import pandas as pd
 import lightgbm as lgb
 import numpy as np
-from delorean.config import MODEL_PARAMS_STAGE1, MODEL_PARAMS_STAGE2
+from delorean.conf.model import MODEL_PARAMS_STAGE1, MODEL_PARAMS_STAGE2, MODEL_PARAMS_DENSEMBLE
 
 class ModelTrainer:
     """
-    Encapsulates the training and prediction logic for the LightGBM model.
+    Encapsulates the training and prediction logic for ML models (LightGBM, DoubleEnsemble).
     """
     def __init__(self, seed: int = 42):
         """
         Initialize the ModelTrainer.
         """
-        self.model: Any = None # Can be LGBModel or lgb.Booster
+        self.model: Any = None 
+        self.model_type: str = "gbm"
         self.selected_features: Optional[List[str]] = None
         self.params: Dict[str, Any] = {}
         self.seed = seed
 
-    def train(self, dataset: DatasetH, selected_features: Optional[List[str]] = None, params: Optional[Dict[str, Any]] = None) -> None:
+    def train(self, dataset: DatasetH, model_type: str = "gbm", selected_features: Optional[List[str]] = None, params: Optional[Dict[str, Any]] = None) -> None:
         """
-        Train the LightGBM model.
+        Train the specified model.
         
         Args:
             dataset (DatasetH): The Qlib dataset object.
-            selected_features (List[str], optional): If provided, train ONLY on these features using native LightGBM.
+            model_type (str): 'gbm' for LightGBM, 'double_ensemble' for DoubleEnsemble architecture.
+            selected_features (List[str], optional): If provided, train ONLY on these features.
             params (Dict[str, Any], optional): Custom hyperparameters to override config.
         """
-        if selected_features:
+        self.model_type = model_type
+        
+        if model_type == "double_ensemble":
+            print("\nUsing DoubleEnsemble Architecture (Regime Robust)...")
+            # Logic for DoubleEnsemble
+            num_features = len(selected_features) if selected_features else 5
+            default_params = MODEL_PARAMS_DENSEMBLE.copy()
+            
+            # Dynamic adjustment based on feature count
+            default_params["bins_fs"] = min(3, num_features // 2 + 1)
+            default_params["enable_fs"] = True if num_features > 3 else False
+            default_params["seed"] = self.seed
+            
+            if params:
+                default_params.update(params)
+            self.params = default_params
+            self.model = DEnsembleModel(**self.params)
+            print("Starts training DoubleEnsemble...")
+            self.model.fit(dataset)
+            
+        elif selected_features:
+
             print(f"\nTraining Optimized LightGBM on {len(selected_features)} selected features...")
             self.selected_features = selected_features
             
@@ -79,7 +104,10 @@ class ModelTrainer:
         """
         print("Generating test set predictions...")
         
-        if self.selected_features:
+        if self.model_type == "double_ensemble":
+            # DoubleEnsemble uses Qlib standard predict(dataset)
+            pred = self.model.predict(dataset)
+        elif self.selected_features:
             # Native Booster Prediction
             df_test = dataset.prepare("test", col_set="feature")
             X_test = df_test[self.selected_features]
@@ -89,6 +117,7 @@ class ModelTrainer:
         else:
             # Qlib LGBModel Prediction
             pred = self.model.predict(dataset)
+
             
         R.save_objects(pred=pred) 
         print("\nTest prediction sample (head 20):\n", pred.head(20))

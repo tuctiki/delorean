@@ -26,20 +26,20 @@ When asked to "mine alpha" or "find signals":
     - Convert this hypothesis into a formula expression (e.g., `-1 * Rank(TsArgMax(SignedPower(If(Returns < 0, Volume, -Volume), 2), 5))`).
 
 3.  **Simulation (The DeLorean Loop)**:
-    - Run a backtest using the generated formula.
+    - Run a multi-period backtest using the generated formula.
     - *Constraint*: Ensure no look-ahead bias (do not use future data for current predictions).
+    - **Regime Audit**: Evaluate the factor on at least three distinct periods (e.g., Bull Market 2019-20, Transition 2021-22, and Bear/Choppy 2023-25).
 
-4.  **Validation**:
-    - **Pass Criteria** (Must align with Alpha Evaluation): 
-        - **Information Coefficient (IC)**: > 0.03 (for target horizon)
-        - **Sharpe Ratio**: > 1.5 (Annualized)
-        - **Turnover**: < 60% (Daily) - *Strict limit*
-    - **Horizon Check**:
-        - Explicitly define the target horizon (e.g., `5-Day` vs `1-Day`).
-        - *Crucial*: If mining for the standardized strategy, use **5-Day Forward Return** as the label (`Ref($close, -5) / $close - 1`).
-    - **Turnover Mitigation**:
-        - If Turnover > 60%, apply smoothing immediately: `Mean(Formula, 5)` or `Decay(Formula, 5)`.
-    - If a factor fails these, refine or discard.
+4.  **Validation & Refinement**:
+    - **Pass Criteria**:
+        - **Mean Rank IC**: > 0.02 (Aggregate)
+        - **IC Consistency**: Positive Rank IC in at least 70% of audited periods.
+        - **Sharpe Ratio**: > 1.0 (Out-of-sample)
+    - **Sign-Flip Analysis**:
+        - Check if the factor's Rank IC flips sign across different regimes.
+        - If a factor is consistently negative in a regime, investigate if the logic is "mean-reverting" vs "trend-following" and adjust the formula sign (e.g., multiply by -1) to match the modern regime.
+    - **Refinement**: Prune factors that add noise but no IC gain when combined with the existing "Refined" library.
+
 
 ## 3. Tools & Libraries
 Use the available Python environment to execute these tasks. Preferred libraries:

@@ -1,0 +1,54 @@
+--- Recent 10 Runs for 'ETF_Strategy' ---
+Run ID: 7d8c9ab205224bd690dab862d6477449
+  Date: 2026-01-17 03:14:23.096000+00:00
+  Status: FINISHED
+  Metrics: {'annual_turnover': 20.65525258598704, 'ann_turnover': 20.65525258598704, 'annualized_return': 0.110496837965535, 'max_drawdown': -0.16215230033204503, 'rank_ic': 0.01438141702381834, 'sharpe': 0.8858865982785235, 'sharpe_ratio': 0.8858865982785235}
+----------------------------------------
+Run ID: e2cef8ca5dfa48f3a3d30d9b999c85ac
+  Date: 2026-01-17 03:11:31.763000+00:00
+  Status: FINISHED
+  Metrics: {'annual_turnover': 49.45995578154789, 'ann_turnover': 49.45995578154789, 'annualized_return': 1.0046719453453499, 'max_drawdown': -0.004789730818919244, 'rank_ic': -0.018513564551404103, 'sharpe': 7.559181954225658, 'sharpe_ratio': 7.559181954225658}
+----------------------------------------
+  >>> DETECTED NEGATIVE RANK IC <<<
+Run ID: 56d5c800e11c4eaf93c43ba177429be8
+  Date: 2026-01-17 03:09:43.084000+00:00
+  Status: FINISHED
+  Metrics: {'annual_turnover': 20.603198607150368, 'ann_turnover': 20.603198607150368, 'annualized_return': 0.11060059957329546, 'max_drawdown': -0.16183142409963017, 'sharpe': 0.8869015664705898, 'sharpe_ratio': 0.8869015664705898}
+----------------------------------------
+Run ID: 590275cf1b4144ddaf93530b33642e5e
+  Date: 2026-01-17 03:07:22.643000+00:00
+  Status: FINISHED
+  Metrics: {'annual_turnover': 23.730106747185776, 'ann_turnover': 23.730106747185776, 'annualized_return': 0.6309701918998661, 'max_drawdown': -0.016612984815201286, 'rank_ic': -0.012937397164456828, 'sharpe': 4.549945522512657, 'sharpe_ratio': 4.549945522512657}
+----------------------------------------
+  >>> DETECTED NEGATIVE RANK IC <<<
+Run ID: ed7db2c32e3240b086988725a2753787
+  Date: 2026-01-17 03:05:18.280000+00:00
+  Status: FINISHED
+  Metrics: {}
+----------------------------------------
+Run ID: e48be00d80d54db0a734f7f4eae03bea
+  Date: 2026-01-17 03:02:46.919000+00:00
+  Status: FINISHED
+  Metrics: {}
+----------------------------------------
+Run ID: fd91186f3602443c9861b6827dfa38a6
+  Date: 2026-01-17 03:01:01.909000+00:00
+  Status: FINISHED
+  Metrics: {}
+----------------------------------------
+Run ID: 40cfe4dbfacf48948b468d22d697c55d
+  Date: 2026-01-17 02:55:47.719000+00:00
+  Status: FINISHED
+  Metrics: {}
+----------------------------------------
+Run ID: 951f1de6c33e4ffdac0eed1c11a17df3
+  Date: 2026-01-17 02:55:05.237000+00:00
+  Status: FINISHED
+  Metrics: {}
+----------------------------------------
+Run ID: f9e44790e0d844dc850ac9f3c7a42e3f
+  Date: 2026-01-17 02:53:38.375000+00:00
+  Status: FINISHED
+  Metrics: {}
+----------------------------------------
+

@@ -31,3 +31,19 @@ MODEL_PARAMS_STAGE2 = {
     "verbosity": -1,
     # Seed injected at runtime
 }
+# Stage 3: DoubleEnsemble Architecture (Regime Robust)
+MODEL_PARAMS_DENSEMBLE = {
+    "base_model": "gbm",
+    "loss": "mse",
+    "num_models": 3,
+    "bins_sr": 5,
+    "bins_fs": 3,
+    "decay": 1.0,
+    "sample_ratios": [0.8, 0.7, 0.6],
+    "enable_sr": True,
+    "enable_fs": True,
+    "learning_rate": 0.05,
+    "max_depth": 4,
+    "early_stopping_rounds": 50,
+    "epochs": 100
+}
