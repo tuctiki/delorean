@@ -192,10 +192,12 @@ def log_backtest_metrics(report, pred, dataset, recorder):
         annual_turnover = turnover * 252
         
         metrics = {
-            "annual_return": float(annual_return),
-            "sharpe_ratio": float(sharpe),
+            "annualized_return": float(annual_return),
+            "sharpe": float(sharpe),
             "max_drawdown": float(max_dd),
-            "annual_turnover": float(annual_turnover)
+            "ann_turnover": float(annual_turnover),
+            "annual_turnover": float(annual_turnover), # Keep both just in case
+            "sharpe_ratio": float(sharpe) # Keep both
         }
         
         # 3. Rank IC
