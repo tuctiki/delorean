@@ -19,31 +19,32 @@ class ETFDataHandler(DataHandlerLP):
     7-factor library (added RSI_Divergence defensive factor).
     """
         custom_exprs = [
-            "$close / Ref($close, 60) - 1",                     # MOM60
-            "$close / Ref($close, 120) - 1",                    # MOM120
-            # === VALIDATED FACTORS ===
-            "($close - $open) / (Abs($open - Ref($close, 1)) + 0.001)",  # Gap_Fill (Structural)
-            # === ROUND 5 FACTORS (Alpha Mining 2026-01-15) ===
-            "Sum(If($close > Ref($close, 1), 1, 0), 10) / 10",  # Mom_Persistence (IC=0.059)
-            "($close / Ref($close, 5) - 1) - (Ref($close, 5) / Ref($close, 10) - 1)",  # Acceleration (IC=0.053)
-            # Vol_Price_Div with 5-day smoothing
-            "Mean(Corr($close / Ref($close, 1), $volume / Ref($volume, 1), 10), 5)",  # Vol_Price_Div (Smoothed 5d)
-            # === DEFENSIVE FACTOR (2026-01-15) ===
-            "Corr($close / Ref($close, 1) - 1, (Mean(If($close > Ref($close, 1), $close - Ref($close, 1), 0), 14) / (Mean(Abs($close - Ref($close, 1)), 14) + 0.0001)), 10)",  # RSI_Divergence (IC=-0.0305)
-            # === ROUND 3 FACTORS (2026-01-16) ===
-            # Money Flow with 5-day smoothing
-            "Mean(Sum((($close - $low) - ($high - $close)) / ($high - $low + 0.001) * $volume, 20) / Sum($volume, 20), 5)",  # Money_Flow_20 (Smoothed 5d)
+            # === BASELINE ===
+            "$close / Ref($close, 120) - 1",                    # MOM120 (Robust)
+            
+            # === PERSISTENCE ===
+            "Sum(If($close > Ref($close, 1), 1, 0), 10) / 10",  # Mom_Persistence (Keep)
+            
+            # === MONEY FLOW ===
+            # Smoothed Money Flow (Robust)
+            "Mean(Sum((($close - $low) - ($high - $close)) / ($high - $low + 0.001) * $volume, 20) / Sum($volume, 20), 5)",
+
+            # === CONDITIONAL FACTORS (Flip in Bull Regime) ===
+            # RSI_Divergence: Unstable sign. Flip to NEGATIVE in Bull (>1.0).
+            # Base: Corr(Price, RSI_Diff, 10)
+            "If($close / Mean($close, 60) > 1, -1 * Corr($close / Ref($close, 1) - 1, (Mean(If($close > Ref($close, 1), $close - Ref($close, 1), 0), 14) / (Mean(Abs($close - Ref($close, 1)), 14) + 0.0001)), 10), Corr($close / Ref($close, 1) - 1, (Mean(If($close > Ref($close, 1), $close - Ref($close, 1), 0), 14) / (Mean(Abs($close - Ref($close, 1)), 14) + 0.0001)), 10))",
+            
+            # === MINED FACTORS (2026-01-17) ===
+            # Alpha_Gen_8: Inverse Log Open + High Volatility (IC=-0.053) [Flipped]
+            "-1 * (Sum(-1 * (Log($open)), 5) + Std($high, 5))",
         ]
         
         custom_names = [
-             "MOM60",
              "MOM120",
-             "Gap_Fill",
              "Mom_Persistence",
-             "Acceleration",
-             "Vol_Price_Div",
-             "RSI_Divergence",
              "Money_Flow_20",
+             "RSI_Div_Cond",
+             "Alpha_Gen_8",
         ]
         return custom_exprs, custom_names
 

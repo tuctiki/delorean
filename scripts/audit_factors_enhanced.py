@@ -144,6 +144,14 @@ def triage_factor(metrics, corr_row, factor_name):
     }
 
 def main():
+    import argparse
+    
+    parser = argparse.ArgumentParser(description='Audit Alpha Factors')
+    parser.add_argument('--start', type=str, default="2023-01-01", help='Start date (YYYY-MM-DD)')
+    parser.add_argument('--end', type=str, default="2025-12-31", help='End date (YYYY-MM-DD)')
+    parser.add_argument('--output', type=str, default="artifacts/factor_audit_detailed.csv", help='Output CSV path')
+    args = parser.parse_args()
+    
     print("=" * 80)
     print("🔍 ALPHA FACTOR AUDIT - Comprehensive Evaluation")
     print("=" * 80)
@@ -156,9 +164,9 @@ def main():
     for i, name in enumerate(names, 1):
         print(f"  {i}. {name}")
     
-    # Audit period: Recent out-of-sample data
-    START = "2023-01-01"
-    END = "2025-12-31"
+    # Audit period
+    START = args.start
+    END = args.end
     LABEL_HORIZON = 5
     
     print(f"\n📅 Audit Period: {START} to {END}")
@@ -295,11 +303,11 @@ def main():
         print("\n✓ No highly correlated pairs found (all |Corr| < 0.7)")
     
     # Save results
-    output_file = "artifacts/factor_audit_detailed.csv"
+    output_file = args.output
     df_final.to_csv(output_file, index=False)
     print(f"\n💾 Detailed audit saved to {output_file}")
     
-    corr_file = "artifacts/factor_correlation_matrix.csv"
+    corr_file = output_file.replace(".csv", "_corr.csv")
     corr_matrix.to_csv(corr_file)
     print(f"💾 Correlation matrix saved to {corr_file}")
     
