@@ -7,8 +7,8 @@ def test_custom_factors_structure():
     """Test that get_custom_factors returns correct tuple structure."""
     exprs, names = ETFDataHandler.get_custom_factors()
     
-    assert isinstance(exprs, list)
-    assert isinstance(names, list)
+    assert isinstance(exprs, (list, tuple))
+    assert isinstance(names, (list, tuple))
     assert len(exprs) == len(names)
     assert len(names) == 5, f"Expected 5 factors, got {len(names)}"
     

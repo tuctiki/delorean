@@ -48,18 +48,19 @@ Delorean is a momentum-based ETF rotation strategy that:
 ```
 delorean/
 ├── delorean/               # Core strategy package
-│   ├── data.py            # ETF data handlers & factor definitions
+│   ├── alphas/            # [NEW] Alpha factor registry
+│   ├── conf/              # [NEW] Modular configuration
+│   ├── data/              # [Refactored] Data handlers & loaders
+│   ├── strategy/          # Portfolio & execution logic
+│   ├── runner.py          # [NEW] Unified execution engine
+│   ├── pipeline.py        # Daily task orchestrator
 │   ├── model.py           # LightGBM model trainer
 │   ├── backtest.py        # Backtest engine with signal smoothing
-│   ├── analysis.py        # Performance analytics & plots
-│   ├── signals.py         # Signal smoothing utilities
-│   ├── config.py          # Strategy configuration
-│   └── strategy/          # Portfolio & execution logic
-│       ├── portfolio.py   # Risk parity + vol targeting
-│       └── execution.py   # Order generation with turnover control
+│   └── analysis.py        # Performance analytics & plots
 ├── scripts/
-│   ├── run_etf_analysis.py    # Main backtest script
-│   └── run_live_trading.py    # Daily signal generator
+│   ├── ops/               # Operations (Backtest, Live Trading)
+│   ├── research/          # Factor mining & Validation
+│   └── analysis/          # Ad-hoc analysis
 ├── server/                # FastAPI backend
 └── frontend/              # Next.js dashboard
 ```
