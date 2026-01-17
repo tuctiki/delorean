@@ -233,12 +233,21 @@ def log_backtest_metrics(report, pred, dataset, recorder):
                     label = label_df.iloc[:, 0]
 
             if label is not None:
+                # Ensure label index matches pred index (datetime, instrument)
+                if isinstance(label.index, pd.MultiIndex):
+                    levels = label.index.names
+                    # If index is (instrument, datetime), swap it
+                    if len(levels) == 2 and (levels[0] == 'instrument' or levels[0] == 'asset'):
+                         label = label.swaplevel().sort_index()
+                
                 # Align indices
                 common = pred.index.intersection(label.index)
                 if not common.empty:
                     # Calculate Rank IC (Spearman)
                     ic = pred.loc[common].corr(label.loc[common], method='spearman')
                     metrics["rank_ic"] = float(ic)
+                else:
+                    print(f"Rank IC warning: No overlapping indices. Pred: {pred.index[0]}... Label: {label.index[0]}...")
                     
         except Exception as e:
             print(f"Rank IC calc failed: {e}")
