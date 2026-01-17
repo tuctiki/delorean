@@ -242,6 +242,7 @@ class BacktestEngine:
             "signal": pred_to_use,  # Use smoothed predictions
             "trend_feature": trend_feature,
             "regime_feature": regime_feature,
+            "vol_feature": kwargs.get('vol_feature'), # Pass Volatility Feature
             "target_vol": kwargs.get('target_vol', None),
             "buffer": kwargs.get('buffer', 2),
             "n_drop": kwargs.get('n_drop', 1),
