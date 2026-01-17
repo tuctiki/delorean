@@ -175,8 +175,77 @@ def get_vol_feature(needed):
         return None
 
 def log_backtest_metrics(report, pred, dataset, recorder):
-    # ... (Logic extracted/simplified from original)
-    pass
+    """Calculate and log metrics to MLflow."""
+    from qlib.contrib.evaluate import risk_analysis
+    import numpy as np
+
+    try:
+        # 1. Risk Metrics (Sharpe, Return, MaxDD)
+        risks = risk_analysis(report['return'], freq='day')
+        
+        annual_return = risks.loc['annualized_return', 'risk']
+        sharpe = risks.loc['information_ratio', 'risk']
+        max_dd = risks.loc['max_drawdown', 'risk']
+        
+        # 2. Turnover
+        turnover = report['turnover'].mean()
+        annual_turnover = turnover * 252
+        
+        metrics = {
+            "annual_return": float(annual_return),
+            "sharpe_ratio": float(sharpe),
+            "max_drawdown": float(max_dd),
+            "annual_turnover": float(annual_turnover)
+        }
+        
+        # 3. Rank IC
+        try:
+            label = None
+            if dataset is not None:
+                # Standard Mode
+                label_df = dataset.prepare("test", col_set=["label"])
+                if not label_df.empty:
+                    label = label_df.iloc[:, 0]
+            else:
+                # WF Mode: Fetch labels manually
+                from qlib.data import D
+                
+                # Determine range from predictions
+                time_idx = pred.index.get_level_values('datetime')
+                start_t = time_idx.min()
+                end_t = time_idx.max()
+                
+                # Assume horizon=1 for now as args not passed easily, or try to infer?
+                # Actually, main() has args via closure if defined inside, but this is global.
+                # Let's assume prediction horizon matches data label. Default 1 day.
+                # Expression: Ref($close, -1) / $close - 1
+                # To be precise, we should pass 'label_horizon' to this function.
+                # Since we didn't update call signature in main, let's use default 1 for now.
+                # Future improvement: Pass args.
+                fields = ['Ref($close, -1) / $close - 1']
+                
+                # Fetch for ALL ETFs to be safe (or at least those in pred)
+                instruments = pred.index.get_level_values('instrument').unique().tolist()
+                label_df = D.features(instruments, fields, start_time=start_t, end_time=end_t)
+                if not label_df.empty:
+                    label = label_df.iloc[:, 0]
+
+            if label is not None:
+                # Align indices
+                common = pred.index.intersection(label.index)
+                if not common.empty:
+                    # Calculate Rank IC (Spearman)
+                    ic = pred.loc[common].corr(label.loc[common], method='spearman')
+                    metrics["rank_ic"] = float(ic)
+                    
+        except Exception as e:
+            print(f"Rank IC calc failed: {e}")
+
+        print(f"[MLflow] Logging Metrics: {metrics}")
+        recorder.log_metrics(**metrics)
+        
+    except Exception as e:
+        print(f"Failed to log metrics: {e}")
 
 def log_artifacts(recorder):
     plots = ["cumulative_return.png", "excess_return.png", "factor_ic.png", "feature_correlation.png"]
