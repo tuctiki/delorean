@@ -115,7 +115,7 @@ class PortfolioOptimizer:
              trend_score = max(0, regime_ratio - 0.97)
              # Slope = 16.7: (0.97, 0.0) to (1.03, 1.0)
              # S = (1.0 - 0.0) / (1.03 - 0.97) = 1.0 / 0.06 = 16.67
-             dynamic_leverage = 0.0 + (trend_score * 16.67)
+             dynamic_leverage = 0.30 + (trend_score * 11.67)
              dynamic_leverage = min(1.0, dynamic_leverage)
              
              # Apply the stricter of Vol Scaling or Trend Cap

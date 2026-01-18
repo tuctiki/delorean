@@ -29,7 +29,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--label_horizon", type=int, default=1, help="Forward return label horizon")
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
     parser.add_argument("--smooth_window", type=int, default=10, help="EWMA smoothing halflife")
-    parser.add_argument("--signal_halflife", type=int, default=3, help="EMA smoothing for prediction scores")
+    parser.add_argument("--signal_halflife", type=int, default=15, help="EMA smoothing for prediction scores")
 
     parser.add_argument("--rebalance_threshold", type=float, default=0.05, help="Rebalancing threshold (default: 0.05)")
     parser.add_argument("--n_drop", type=int, default=2, help="Maximum number of stocks to swap per day (default: 2)")

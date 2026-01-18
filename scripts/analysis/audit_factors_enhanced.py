@@ -174,8 +174,8 @@ def main():
     
     # Load all factors and label
     label_expr = f"Ref($close, -{LABEL_HORIZON}) / $close - 1"
-    fields = exprs + [label_expr]
-    field_names = names + ["label"]
+    fields = list(exprs) + [label_expr]
+    field_names = list(names) + ["label"]
     
     print("📥 Loading data...")
     df = D.features(ETF_LIST, fields, start_time=START, end_time=END, freq='day')
@@ -188,7 +188,7 @@ def main():
     
     print(f"✓ Loaded {len(df)} data points\n")
     
-    df_factors = df[names]
+    df_factors = df[list(names)]
     df_label = df["label"]
     
     # Evaluate each factor

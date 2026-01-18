@@ -8,7 +8,7 @@ DEFAULT_BACKTEST_PARAMS = {
     "label_horizon": 1,
     "smooth_window": 10,
     "target_vol": 0.20,
-    "signal_halflife": 5,        # EMA smoothing for turnover reduction
+    "signal_halflife": 15,       # EMA smoothing for turnover reduction (Golden Config)
     "buffer": 3,                  # Increased from 2 for wider hysteresis
     "rebalance_threshold": 0.05,  # Increased from 0.02 (5% threshold)
 }
@@ -24,6 +24,6 @@ LIVE_TRADING_CONFIG = {
     "label_horizon": 1,          # Forward return prediction horizon (Reduced from 5)
     "topk": 4,                   # Number of top ETFs to recommend (Reduced from 5)
     "target_vol": 0.20,          # Default target volatility
-    "signal_halflife": 5,        # EMA smoothing for prediction scores
+    "signal_halflife": 15,       # EMA smoothing for prediction scores (Golden Config)
     "rebalance_threshold": 0.05, # Rebalancing threshold (5%)
 }

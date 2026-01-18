@@ -4,33 +4,31 @@ Alpha Factor Registry.
 Central source of truth for all alpha factors used in the strategy.
 """
 
-# ULTRA 6 (1-Day Optimized): High-IC Selection Library
-# Focused on finding leadership and stability for daily rebalancing.
-# Last Updated: 2026-01-18
+# ULTRA 8 (Inherently Stable): Redesigned for Low Turnover
+# Using longer lookback windows (20-60 days) and MA ratios
+# Last Updated: 2026-01-18 (Fundamental Redesign for Stability)
 PRODUCTION_FACTORS = [
     # (Expression, Name)
     
-    # === MOMENTUM & SKEW ===
-    # Vol_Skew_20: Anti-lottery effect. 2022-2025 IC: +0.054
-    ("-1 * Skew($close / Ref($close, 1) - 1, 20)", "Vol_Skew_20"),
-    # Selection_Trend: GP-Mined momentum multiplier. 2022-2025 IC: +0.028
-    ("Log(Abs($close / Ref($close, 20) - 1) + 1.0001) * Power(($close / Mean($close, 60) - 1), 2)", "Selection_Trend"),
+    # === MOMENTUM (STABLE) ===
+    # Momentum_20: Simple 20-day momentum - changes slowly
+    ("$close / Ref($close, 20) - 1", "Momentum_20"),
     
-    # === GP-MINED CORE ===
-    # Alpha_Gen_8: GP-Mined price-range signal. 2022-2025 IC: +0.029
-    ("-1 * (Sum(-1 * (Log($open + 1e-5)), 5) + Std($high, 5))", "Alpha_Gen_8"),
+    # Momentum_60: Long-term 60-day momentum
+    ("$close / Ref($close, 60) - 1", "Momentum_60"),
     
-    # === VOL-PRICE DYNAMICS ===
-    # Vol_Price_Div_Rev: Mean-reversion confirmation. 2022-2025 IC: +0.029
-    ("Mean(-1 * Corr($close / Ref($close, 1), $volume / Ref($volume, 1), 10), 5)", "Vol_Price_Div_Rev"),
+    # === MOVING AVERAGE RATIOS (VERY STABLE) ===
+    # MA_Ratio_20_60: Price relative to moving averages (changes slowly)
+    ("Mean($close, 20) / (Mean($close, 60) + 1e-6) - 1", "MA_Ratio_20_60"),
     
-    # === SHORT-TERM MEAN REVERSION (REVERSED) ===
-    # Smart_Flow_Rev: Captures liquidity exhaustion. 2022-2025 IC: +0.032
-    ("-1 * ($close - $low) / ($high - $low + 0.001) * (Mean($volume, 5) / Mean($volume, 20))", "Smart_Flow_Rev"),
-    # Gap_Fill_Rev: Short-term price reversal from gap extremes. 2022-2025 IC: +0.027
-    ("-1 * ($close - $open) / (Abs($open - Ref($close, 1)) + 0.001)", "Gap_Fill_Rev"),
+    # === VOLATILITY-ADJUSTED RETURNS ===
+    # RiskAdjReturn_60: 60-day return / 60-day volatility
+    ("($close / Ref($close, 60) - 1) / (Std($close / Ref($close, 1), 60) + 0.01)", "RiskAdjReturn_60"),
+    
+    # === PRICE POSITION (RANGE-BASED, STABLE) ===
+    # PricePosition_60: Where price is within its 60-day range
+    ("($close - Min($close, 60)) / (Max($close, 60) - Min($close, 60) + 1e-6)", "PricePosition_60"),
 ]
-
 
 
 def get_production_factors():
