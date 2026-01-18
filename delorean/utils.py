@@ -213,6 +213,8 @@ def run_standard_backtest(
     target_vol: float = 0.20,
     use_regime_filter: bool = True,
     use_trend_filter: bool = False,
+    n_drop: int = 1,
+    rebalance_threshold: float = 0.05,
     start_time: Optional[str] = None,
     end_time: Optional[str] = None
 ) -> Tuple[pd.DataFrame, dict]:
@@ -243,7 +245,10 @@ def run_standard_backtest(
         buffer=buffer,
         target_vol=target_vol,
         use_regime_filter=use_regime_filter,
+
         use_trend_filter=use_trend_filter,
+        n_drop=n_drop,
+        rebalance_threshold=rebalance_threshold,
         start_time=start_time,
         end_time=end_time
     )

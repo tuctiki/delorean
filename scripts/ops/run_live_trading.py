@@ -107,7 +107,9 @@ def run_validation(today: datetime.datetime, config: dict) -> dict:
             buffer=config.get("buffer_size", 2),
             target_vol=config.get("target_vol", 0.20),
             use_regime_filter=True,
-            use_trend_filter=False
+            use_trend_filter=False,
+            n_drop=config.get("n_drop", 2),
+            rebalance_threshold=config.get("rebalance_threshold", 0.05)
         )
         risks = risk_analysis(report["return"], freq="day")
         sharpe = risks.loc["information_ratio", "risk"]
@@ -275,6 +277,8 @@ def build_recommendation_artifact(
         "buffer": buffer_size,
         "label_horizon": label_horizon,
         "target_vol": target_vol_config,
+        "n_drop": config.get("n_drop", 2),
+        "rebalance_threshold": config.get("rebalance_threshold", 0.05),
         "risk_degree": 0.95,
         "mode": "Risk Parity + Asymmetric Vol Scaling"
     }
@@ -362,12 +366,14 @@ def print_recommendations(pred: pd.Series, config: dict, regime_ratio: float) ->
     print(f"- Portfolio Mode: Asymmetric Vol Scaling (Current Ratio: {regime_ratio:.2f})")
 
 
-def get_trading_signal(topk: int = None) -> None:
+def get_trading_signal(topk: int = None, n_drop: int = None, rebalance_threshold: float = None) -> None:
     """
     Main orchestrator: Generate trading signals for the latest date.
     
     Args:
         topk: Number of top ETFs. Defaults to config value.
+        n_drop: Max ETFs to drop. Defaults to config.
+        rebalance_threshold: Portfolio turnover threshold.
     """
     # Initialize
     qlib.init(provider_uri=QLIB_PROVIDER_URI, region=QLIB_REGION)
@@ -375,6 +381,10 @@ def get_trading_signal(topk: int = None) -> None:
     config = LIVE_TRADING_CONFIG.copy()
     if topk is not None:
         config["topk"] = topk
+    if n_drop is not None:
+        config["n_drop"] = n_drop
+    if rebalance_threshold is not None:
+        config["rebalance_threshold"] = rebalance_threshold
     
     print("\n" + "="*50)
     print("  ETF Strategy Live Signal Generator")
@@ -449,4 +459,11 @@ def get_trading_signal(topk: int = None) -> None:
 
 
 if __name__ == "__main__":
-    get_trading_signal()
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--topk", type=int, help="Override TopK")
+    parser.add_argument("--n_drop", type=int, help="Override n_drop")
+    parser.add_argument("--rebalance_threshold", type=float, help="Override rebalance_threshold")
+    args = parser.parse_args()
+    
+    get_trading_signal(topk=args.topk, n_drop=args.n_drop, rebalance_threshold=args.rebalance_threshold)

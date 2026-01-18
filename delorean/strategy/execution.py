@@ -7,7 +7,7 @@ class ExecutionModel:
     """
     Handles order generation with turnover control (buffer).
     """
-    def __init__(self, topk: int = 5, buffer: int = 2, n_drop: int = 1, rebalance_threshold: float = 0.05):
+    def __init__(self, topk: int = 5, buffer: int = 2, n_drop: int = 2, rebalance_threshold: float = 0.05):
         self.topk = topk
         self.buffer = buffer
         self.n_drop = n_drop

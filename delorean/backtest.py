@@ -22,9 +22,9 @@ class SimpleTopkStrategy(BaseSignalStrategy):
         risk_degree (float): Percentage of capital to invest.
         n_drop (int): Maximum number of stocks to swap per trading step if trading occurs.
     """
-    def __init__(self, topk: int = 4, risk_degree: float = 0.95, n_drop: int = 1, buffer: int = 2, 
+    def __init__(self, topk: int = 4, risk_degree: float = 0.95, n_drop: int = 2, buffer: int = 2, 
                  vol_feature: pd.Series = None, trend_feature: pd.Series = None, regime_feature: pd.Series = None, 
-                 target_vol: float = None, **kwargs: Any):
+                 target_vol: float = None, rebalance_threshold: float = 0.05, **kwargs: Any):
         super().__init__(risk_degree=risk_degree, **kwargs)
         self.topk = topk
         self.n_drop = n_drop
@@ -40,7 +40,7 @@ class SimpleTopkStrategy(BaseSignalStrategy):
             topk=topk, 
             buffer=buffer, 
             n_drop=n_drop,
-            rebalance_threshold=kwargs.get('rebalance_threshold', 0.05)  # Default 5%
+            rebalance_threshold=rebalance_threshold  # Use explicit arg
         )
 
     def generate_trade_decision(self, execute_result: Any = None) -> TradeDecisionWO:
@@ -161,7 +161,7 @@ class BacktestEngine:
             topk (int): Number of stocks to hold in the TopK strategy.
             start_time (str|pd.Timestamp): Custom start time for backtest. Defaults to config.TEST_START_TIME.
             end_time (str|pd.Timestamp): Custom end time for backtest. Defaults to derived from data.
-            end_time (str|pd.Timestamp): Custom end time for backtest. Defaults to derived from data.
+
             use_trend_filter (bool): Whether to enable the per-asset trend filter (Default: False).
             use_regime_filter (bool): Whether to enable the market regime trend filter (Default: False).
             target_vol (float): Annualized Target Volatility (e.g. 0.20 for 20%). None = No targeting.
@@ -234,7 +234,7 @@ class BacktestEngine:
         # Strategy Config
         # Filter out engine-only parameters before passing to strategy
         filtered_kwargs = {k: v for k, v in kwargs.items() 
-                          if k not in ['signal_halflife', 'rebalance_threshold', 'vol_feature', 'buffer', 'n_drop']}
+                          if k not in ['signal_halflife', 'rebalance_threshold', 'vol_feature', 'buffer', 'n_drop', 'target_vol']}
         
         STRATEGY_CONFIG = {
             "topk": topk,
@@ -246,6 +246,7 @@ class BacktestEngine:
             "target_vol": kwargs.get('target_vol', None),
             "buffer": kwargs.get('buffer', 2),
             "n_drop": kwargs.get('n_drop', 1),
+            "rebalance_threshold": kwargs.get('rebalance_threshold', 0.05),
             **filtered_kwargs
         }
 

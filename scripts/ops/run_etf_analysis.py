@@ -23,13 +23,16 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--use_alpha158", action="store_true", help="Use Qlib Alpha158 embedded factors")
     parser.add_argument("--use_hybrid", action="store_true", help="Use Hybrid Factors (Custom + Alpha158)")
     parser.add_argument("--risk_parity", action="store_true", help="Enable Volatility Targeting (1/Vol)")
-    parser.add_argument("--dynamic_exposure", action="store_true", help="Enable Trend-based Dynamic Exposure")
+    parser.add_argument("--no_dynamic_exposure", action="store_false", dest="dynamic_exposure", help="Disable Trend-based Dynamic Exposure")
+    parser.set_defaults(dynamic_exposure=True)
     parser.add_argument("--buffer", type=int, default=3, help="Rank Buffer for Hysteresis")
     parser.add_argument("--label_horizon", type=int, default=1, help="Forward return label horizon")
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
     parser.add_argument("--smooth_window", type=int, default=10, help="EWMA smoothing halflife")
     parser.add_argument("--signal_halflife", type=int, default=3, help="EMA smoothing for prediction scores")
+
     parser.add_argument("--rebalance_threshold", type=float, default=0.05, help="Rebalancing threshold (default: 0.05)")
+    parser.add_argument("--n_drop", type=int, default=2, help="Maximum number of stocks to swap per day (default: 2)")
     
     # Time Range Overrides
     parser.add_argument("--start_time", type=str, default=None, help="Backtest Data Start Time")
@@ -39,7 +42,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--experiment_name", type=str, default=DEFAULT_EXPERIMENT_NAME, help="Configs Experiment Name")
     
     # Walk-Forward Validation
-    parser.add_argument("--no_walk_forward", action="store_false", dest="walk_forward", help="Disable walk-forward validation")
     parser.set_defaults(walk_forward=True)
     parser.add_argument("--train_window_months", type=int, default=24, help="Training window in months")
     parser.add_argument("--retrain_frequency_months", type=int, default=1, help="Retrain frequency in months")
@@ -140,7 +142,7 @@ def main() -> None:
         
         report, positions = backtest_engine.run(
             topk=args.topk,
-            n_drop=1,
+            n_drop=args.n_drop,
             buffer=args.buffer,
             vol_feature=vol_feature,
             target_vol=args.target_vol,

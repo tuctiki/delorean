@@ -17,12 +17,12 @@ def test_custom_factors_contains_expected_factors():
     _, names = ETFDataHandler.get_custom_factors()
     
     expected_factors = [
-        "MOM60",
-        "MOM120",
-        "Vol_Price_Div_Rev",
-        "Money_Flow_20",
-        "Range_Pos_20",
+        "Vol_Skew_20",
+        "Selection_Trend",
         "Alpha_Gen_8",
+        "Vol_Price_Div_Rev",
+        "Smart_Flow_Rev",
+        "Gap_Fill_Rev",
     ]
     
     for factor in expected_factors:

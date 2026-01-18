@@ -8,7 +8,7 @@ Delorean is a momentum-based ETF rotation strategy that:
 - Predicts next-day returns using 7 proprietary alpha factors
 - Holds top 4 ETFs with dynamic risk management
 - Uses walk-forward validation for robust out-of-sample testing
-- Achieves **Sharpe ratio of 0.87** with **22.5% annualized turnover**
+- Achieves **Sharpe ratio of 0.60** with **19.1% annualized turnover**
 
 ## Key Features
 
@@ -97,16 +97,14 @@ python -m qlib.run.get_data qlib_data --target_dir ~/.qlib/qlib_data/cn_etf_data
 
 ```bash
 # Walk-forward validation (default)
-conda run -n quant python scripts/run_etf_analysis.py
-
-# Standard backtest (faster, less robust)
-conda run -n quant python scripts/run_etf_analysis.py --no_walk_forward
+# Default (Walk-Forward, n_drop=2, dynamic_exposure=True)
+conda run -n quant python scripts/ops/run_etf_analysis.py
 
 # Custom parameters
-conda run -n quant python scripts/run_etf_analysis.py \
-  --signal_halflife 3 \
-  --buffer 3 \
-  --target_vol 0.20
+conda run -n quant python scripts/ops/run_etf_analysis.py \
+  --n_drop 4 \
+  --rebalance_threshold 0.1 \
+  --target_vol 0.25
 ```
 
 ### Launch Dashboard
@@ -124,7 +122,10 @@ Access at: http://localhost:3000
 ### Generate Live Signals
 
 ```bash
-conda run -n quant python scripts/run_live_trading.py
+conda run -n quant python scripts/ops/run_live_trading.py
+
+# Custom live parameters
+conda run -n quant python scripts/ops/run_live_trading.py --n_drop 2 --rebalance_threshold 0.1
 # Output: daily_recommendations.json
 ```
 
@@ -138,6 +139,7 @@ DEFAULT_BACKTEST_PARAMS = {
     "buffer": 3,                  # Rank hysteresis buffer
     "signal_halflife": 3,         # Signal smoothing (days)
     "rebalance_threshold": 0.05,  # 5% rebalancing threshold
+    "n_drop": 2,                  # Max 2 drops per day
     "target_vol": 0.20,           # 20% target volatility
     "smooth_window": 10,          # Model output smoothing
 }
