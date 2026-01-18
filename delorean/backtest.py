@@ -97,7 +97,9 @@ class SimpleTopkStrategy(BaseSignalStrategy):
         # 4. Portfolio Optimization (Target Weights)
         # [NEW] Dynamic TopK: Reduce holdings in Bear Market to concentrate quality
         current_topk = self.topk
-        if current_regime is not None and current_regime <= 0.97:
+        is_bear_start = (current_regime is not None and current_regime <= 0.97)
+        
+        if is_bear_start:
             current_topk = 2
             
         # Sort and take top K candidates for weighting
@@ -123,7 +125,8 @@ class SimpleTopkStrategy(BaseSignalStrategy):
         )
 
         return TradeDecisionWO(orders, self)
-
+    
+    # ... (Rest of SimpleTopkStrategy methods: _get_pred_scores, _get_target_stocks) ...
     def _get_pred_scores(self, trade_step: int) -> Optional[pd.Series]:
         """Fetch prediction scores for the next trading day (shift=1)."""
         pred_start_time, pred_end_time = self.trade_calendar.get_step_time(trade_step, shift=1)
@@ -137,10 +140,6 @@ class SimpleTopkStrategy(BaseSignalStrategy):
     def _get_target_stocks(self, pred_score: pd.Series) -> pd.Index:
         """Identify Top K stocks."""
         return pred_score.sort_values(ascending=False).head(self.topk).index
-
-
-
-
 
 class BacktestEngine:
     """
@@ -215,9 +214,11 @@ class BacktestEngine:
             except Exception as e:
                 print(f"Warning: Failed to fetch Trend Feature/Data for backtest: {e}")
 
-        # Fetch Regime Feature if needed
+        # Fetch Regime Features
         regime_feature = None
+        
         if use_regime_filter:
+            from delorean.conf.assets import REGIME_BENCHMARK
             from delorean.utils import fetch_regime_ratio
             try:
                 # Need consistent time range
@@ -225,11 +226,9 @@ class BacktestEngine:
                 start_t = time_idx.min()
                 end_t = time_idx.max()
                 
-                regime_feature = fetch_regime_ratio(BENCHMARK, start_t, end_t)
+                regime_feature = fetch_regime_ratio(REGIME_BENCHMARK, start_t, end_t)
             except Exception as e:
                 print(f"Warning: Failed to fetch Regime Feature for backtest: {e}")
-
-
 
         # Strategy Config
         # Filter out engine-only parameters before passing to strategy

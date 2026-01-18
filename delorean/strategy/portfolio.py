@@ -6,7 +6,7 @@ logger = logging.getLogger("delorean.strategy.portfolio")
 
 # Asymmetric Volatility Settings
 BULL_TARGET_VOL = 0.30  # Relaxed in bull markets (allow full gains)
-BEAR_TARGET_VOL = 0.12  # Aggressive in bear markets (protect capital)
+BEAR_TARGET_VOL = 0.06  # Aggressive in bear markets (protect capital)
 
 # Hysteresis Thresholds (to reduce turnover from frequent regime switching)
 # Set to 1.0 to disable hysteresis (original Phase 9 behavior)
@@ -113,8 +113,9 @@ class PortfolioOptimizer:
         # Ratio >= 1.03 (Strong Bull) -> Cap at 100%
         if regime_ratio is not None:
              trend_score = max(0, regime_ratio - 0.97)
-             # Slope = 13.3: (1.03 - 0.97) * 13.3 = 0.8 + 0.20 = 1.0
-             dynamic_leverage = 0.20 + (trend_score * 13.3)
+             # Slope = 16.7: (0.97, 0.0) to (1.03, 1.0)
+             # S = (1.0 - 0.0) / (1.03 - 0.97) = 1.0 / 0.06 = 16.67
+             dynamic_leverage = 0.0 + (trend_score * 16.67)
              dynamic_leverage = min(1.0, dynamic_leverage)
              
              # Apply the stricter of Vol Scaling or Trend Cap

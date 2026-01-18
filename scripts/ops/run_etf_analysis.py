@@ -161,6 +161,13 @@ def main() -> None:
         analyzer = ResultAnalyzer()
         analyzer.process(report, positions)
         
+        # Save CSV Artifacts for Debugging
+        report.to_csv("artifacts/report.csv")
+        
+        # Save positions as text to avoid serialization issues
+        with open("artifacts/positions.txt", "w") as f:
+            f.write(str(positions))
+        
         log_artifacts(recorder)
 
 def fix_seed_and_init(seed):
@@ -272,7 +279,7 @@ def log_backtest_metrics(report, pred, dataset, recorder):
         print(f"Failed to log metrics: {e}")
 
 def log_artifacts(recorder):
-    plots = ["cumulative_return.png", "excess_return.png", "factor_ic.png", "feature_correlation.png"]
+    plots = ["cumulative_return.png", "excess_return.png", "factor_ic.png", "feature_correlation.png", "report.csv", "positions.txt"]
     for p in plots:
         p_path = os.path.join("artifacts", p)
         if os.path.exists(p_path):

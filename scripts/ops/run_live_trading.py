@@ -21,7 +21,7 @@ from qlib.contrib.evaluate import risk_analysis
 import matplotlib.pyplot as plt
 
 from delorean.config import (
-    QLIB_PROVIDER_URI, QLIB_REGION, BENCHMARK, ETF_NAME_MAP,
+    QLIB_PROVIDER_URI, QLIB_REGION, BENCHMARK, REGIME_BENCHMARK, ETF_NAME_MAP,
     ETF_LIST, LIVE_TRADING_CONFIG
 )
 from delorean.data import ETFDataLoader
@@ -404,7 +404,7 @@ def get_trading_signal(topk: int = None, n_drop: int = None, rebalance_threshold
     try:
         # Fetch last 120 days to ensure we have MA60 data
         regime_series = fetch_regime_ratio(
-            BENCHMARK,
+            REGIME_BENCHMARK,
             (today - datetime.timedelta(days=120)).strftime("%Y-%m-%d"),
             today.strftime("%Y-%m-%d")
         )

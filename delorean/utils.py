@@ -200,6 +200,7 @@ def fetch_volatility_feature(
         # Qlib returns (instrument, datetime), so we swap levels
         if vol_series.index.names == ['instrument', 'datetime']:
              vol_series = vol_series.swaplevel().sort_index()
+             
         return vol_series
     except Exception as e:
         logger.error(f"Failed to fetch volatility feature: {e}")
@@ -245,7 +246,6 @@ def run_standard_backtest(
         buffer=buffer,
         target_vol=target_vol,
         use_regime_filter=use_regime_filter,
-
         use_trend_filter=use_trend_filter,
         n_drop=n_drop,
         rebalance_threshold=rebalance_threshold,

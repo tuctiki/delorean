@@ -102,5 +102,8 @@ ETF_NAME_MAP = {
     "510880.SH": "Dividend (RedChip)",
 }
 
-# Benchmark
+# Benchmark for Reporting (Must be an ETF/Tradeable)
 BENCHMARK = "510300.SH"
+
+# Benchmark for Market Regime (Index)
+REGIME_BENCHMARK = "510300.SH"
