@@ -12,19 +12,21 @@ Delorean is a momentum-based ETF rotation strategy that:
 
 ## Key Features
 
-### Alpha Factors (Refined 5)
-- **Momentum**: MOM60, MOM120 (Core trending signals)
-- **Volume / Flow**: Vol_Price_Div_Rev (**Sign-flipped** for modern regimes)
-- **Liquidity**: Money_Flow_20 (Accumulation/Distribution)
-- **Structural**: Range_Pos_20 (**New!** Bull market breakout signal)
-- **Mined**: Alpha_Gen_8 (Standardized genetic predictor)
+### Alpha Factors (Ultra 6: 1-Day Optimized)
+- **Momentum & Skew**: 
+  - `Vol_Skew_20` (Anti-lottery, flipped skew)
+  - `Selection_Trend` (GP-mined momentum multiplier)
+- **Volume / Flow**: 
+  - `Vol_Price_Div_Rev` (Mean-reversion confirmation)
+  - `Smart_Flow_Rev` (Liquidity exhaustion)
+- **Reversion**: 
+  - `Gap_Fill_Rev` (Short-term gap reversal)
+  - `Alpha_Gen_8` (GP-mined price range signal)
 
-
-### ML Architecture (NEW)
+### ML Architecture
 - **Model**: DoubleEnsemble Architecture (based on Qlib)
 - **Features**: Regime-aware shuffling and sample reweighting
 - **Benefit**: Significantly reduces drawdown and "sign-flip" errors in choppy markets
-
 
 ### Portfolio Management
 - **Risk Parity Weighting**: Inverse volatility weights
@@ -34,21 +36,20 @@ Delorean is a momentum-based ETF rotation strategy that:
   - Bear markets: 12% target vol (capital protection)
 - **Market Regime Filter**: CSI 300 Price/MA60 ratio
 
-### Turnover Control (NEW)
+### Turnover Control
 - **Signal Smoothing**: 3-day EMA + 10-day EWMA for noise reduction
 - **Wide Buffer**: Rank hysteresis (TopK + 3 buffer zone)
 - **Rebalancing Threshold**: 5% portfolio value threshold
-- **Result**: 48% turnover reduction while improving Sharpe ratio
 
 ## Performance Metrics
 
-**Walk-Forward Validation (2023-01-01 to 2026-01-16)**:
-- **Sharpe Ratio**: 0.87
-- **Annual Return**: 11.8%
-- **Max Drawdown**: -18.3%
-- **Annualized Turnover**: 22.5%
-- **Rank IC**: 0.0194
-- **Trading Frequency**: 36% (vs 65% baseline)
+**Walk-Forward Validation (2022-01-01 to 2025-12-31)**:
+- **Sharpe Ratio**: 0.60
+- **Annual Return**: 6.4%
+- **Max Drawdown**: -16.6%
+- **Annualized Turnover**: 19.1x
+- **Rank IC**: 0.016
+- **Trading Frequency**: Daily Rebalancing
 
 ## Project Structure
 
@@ -142,11 +143,14 @@ DEFAULT_BACKTEST_PARAMS = {
 }
 ```
 
-## ETF Universe (18 ETFs)
+## ETF Universe (38 ETFs)
 
 **Broad Market**: CSI 300, A500, ChiNext, STAR 50, CSI 1000, SSE 50, H-Share  
-**Commodities**: Gold, Non-Ferrous Metals  
-**Sectors**: Semiconductors, New Energy, Liquor, Banks, Pharma, Consumer, Solar, Securities, Defense, Dividends
+**Commodities**: Gold, Non-Ferrous Metals, Coal, Steel, Energy, Chemical, Rare Earth  
+**Sectors**:  
+- **Healthcare**: Pharma, Medical Device, Innovative Pharma, TCM, Bio-Pharma  
+- **Consumer**: Liquor, Food & Beverage, Home Appliances, Breeding/Livestock  
+- **Tech/Other**: Semiconductor, New Energy, PV/Solar, Banks, Securities, Defense, Dividend
 
 ## Technical Stack
 
