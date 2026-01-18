@@ -13,8 +13,8 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(
 from delorean.config import QLIB_PROVIDER_URI, QLIB_REGION, ETF_LIST
 
 # --- CONFIGURATION ---
-POPULATION_SIZE = 20
-GENERATIONS = 3
+POPULATION_SIZE = 60
+GENERATIONS = 6
 TOURNAMENT_SIZE = 3
 CROSSOVER_PROB = 0.6
 MUTATION_PROB = 0.3
@@ -23,7 +23,7 @@ HOF_SIZE = 10  # Hall of Fame
 
 # Qlib Operators
 UNARY_OPS = [
-    "Abs", "Log", "Neg", "Inv"
+    "Abs", "Log", "Neg", "Inv", "Sign", "Rank"
 ]
 BINARY_OPS = [
     # (Name, Arity) - Arity 2 (Field, Field)
@@ -31,7 +31,7 @@ BINARY_OPS = [
 ]
 TS_OPS = [
     # (Name, Arity) - Arity 2 (Field, Window)
-    "Ref", "Mean", "Std", "Max", "Min", "Sum", "TsRank", "Decay"
+    "Ref", "Mean", "Std", "Max", "Min", "Sum", "TsRank", "Decay", "Corr", "Cov"
 ]
 # We map them to Qlib strings: F(A), F(A, B), F(A, d)
 
@@ -67,6 +67,10 @@ class Op(Node):
         if self.name == "Div": return f"({self.args[0]} / ({self.args[1]} + 1e-6))" # ProtectDiv
         if self.name == "Neg": return f"-1 * ({self.args[0]})"
         if self.name == "Inv": return f"1 / ({self.args[0]} + 1e-6)"
+        if self.name == "Rank": return f"Rank({self.args[0]})"
+        if self.name == "Sign": return f"Sign({self.args[0]})"
+        if self.name == "Corr": return f"Corr({self.args[0]}, {self.args[1]}, 10)" # Fixed window for Corr/Cov
+        if self.name == "Cov": return f"Cov({self.args[0]}, {self.args[1]}, 10)"
         return f"{self.name}({args_str})"
 
 def random_tree(depth=0, method="grow"):
@@ -77,7 +81,7 @@ def random_tree(depth=0, method="grow"):
         return Field(random.choice(FIELDS))
     
     # Choose Operator Type
-    op_type = random.choice(["unary", "binary", "ts"])
+    op_type = random.choice(["unary", "binary", "ts", "corr"])
     
     if op_type == "unary":
         op = random.choice(UNARY_OPS)
@@ -88,9 +92,20 @@ def random_tree(depth=0, method="grow"):
         return Op(op, [random_tree(depth+1, method), random_tree(depth+1, method)])
         
     elif op_type == "ts":
-        op = random.choice(TS_OPS)
+        ts_ops_clean = [o for o in TS_OPS if o not in ["Corr", "Cov"]] # Exclude corr/cov from standard TS
+        op = random.choice(ts_ops_clean)
         window = Constant(random.choice(WINDOWS))
         return Op(op, [random_tree(depth+1, method), window])
+
+    elif op_type == "corr":
+        op = random.choice(["Corr", "Cov"])
+        # Corr(A, B, d) -> But Qlib Corr is Corr(A, B, d). 
+        # But my Op.__str__ hardcodes window=10 for now to simplify Arity.
+        # Let's actually support variable window:
+        # OpStr handles args. If we pass 2 args, OpStr implementation needs to match.
+        # My previous OpStr edit for Corr was: f"Corr({self.args[0]}, {self.args[1]}, 10)"
+        # So we just need to provide 2 subtrees.
+        return Op(op, [random_tree(depth+1, method), random_tree(depth+1, method)])
 
 def mutate(tree):
     # Point mutation: pick a node and replace with random subtree
@@ -151,7 +166,8 @@ def evaluate_population(population, start_time, end_time):
     
     results = {}
     
-    for expr in unique_exprs:
+    for i, expr in enumerate(unique_exprs):
+        # print(f"  [{i+1}/{len(unique_exprs)}] Evaluating: {expr}")
         try:
             # Quick check: too complex?
             if len(expr) > 200: 
@@ -164,6 +180,7 @@ def evaluate_population(population, start_time, end_time):
             df = df.dropna()
             
             if df.empty:
+                # print(f"    -> Empty result (Invalid)")
                 results[expr] = -999
                 continue
                 

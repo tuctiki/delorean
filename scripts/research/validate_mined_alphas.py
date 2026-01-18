@@ -7,12 +7,13 @@ import qlib
 from qlib.data import D
 import argparse
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from delorean.config import QLIB_PROVIDER_URI, QLIB_REGION, ETF_LIST
 from delorean.data import ETFDataHandler
 
 # Reuse audit logic
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+# Reuse audit logic
+sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "analysis"))
 from audit_factors_enhanced import evaluate_single_factor, calculate_correlation_matrix
 
 def init_qlib():
@@ -47,8 +48,8 @@ def main():
     # Names for mined alphas: Alpha_Gen_1, Alpha_Gen_2...
     mined_names = [f"Alpha_Gen_{i+1}" for i in range(len(alphas))]
     
-    all_exprs = base_exprs + alphas + [f"Ref($close, -{LABEL_HORIZON}) / $close - 1"]
-    all_names = base_names + mined_names + ["label"]
+    all_exprs = list(base_exprs) + alphas + [f"Ref($close, -{LABEL_HORIZON}) / $close - 1"]
+    all_names = list(base_names) + mined_names + ["label"]
     
     # Create a mapping to handle potential duplicates or errors
     # Actually Qlib might error if expressions are identical?
@@ -83,7 +84,7 @@ def main():
     # Correlation Check against BASELINE
     # We want factors that are NOT correlated with existing ones
     print("Checking Correlations...")
-    df_all_factors = df[base_names + mined_names]
+    df_all_factors = df[list(base_names) + mined_names]
     corr_matrix = calculate_correlation_matrix(df_all_factors)
     
     final_candidates = []
@@ -91,8 +92,8 @@ def main():
     for _, row in df_res.iterrows():
         name = row["Name"]
         # Check max correlation with BASE factors
-        corr_with_base = corr_matrix.loc[name, base_names].abs().max()
-        best_match = corr_matrix.loc[name, base_names].abs().idxmax()
+        corr_with_base = corr_matrix.loc[name, list(base_names)].abs().max()
+        best_match = corr_matrix.loc[name, list(base_names)].abs().idxmax()
         
         row["Max_Corr_Base"] = corr_with_base
         row["Corr_Partner"] = best_match

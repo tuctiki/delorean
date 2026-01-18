@@ -11,7 +11,7 @@ import qlib
 from qlib.data import D
 from scipy.stats import spearmanr
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from delorean.config import QLIB_PROVIDER_URI, QLIB_REGION, ETF_LIST
 from delorean.data import ETFDataHandler
 
